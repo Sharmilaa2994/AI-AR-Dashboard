@@ -12,7 +12,7 @@ import {
   getActionDescription,
 } from "../../services/interaction/interactionController";
 
-function CameraFeed() {
+function CameraFeed({ onCursorUpdate }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -189,6 +189,35 @@ function CameraFeed() {
         (landmarks) => {
           const gestureResult =
   recognizeGesture(landmarks);
+// MediaPipe landmark 8 = index finger tip
+const indexFinger = landmarks[8];
+
+if (
+  indexFinger &&
+  onCursorUpdate &&
+  gestureResult.gesture !== "UNKNOWN"
+) {
+  // Convert MediaPipe normalized coordinates
+// into screen coordinates.
+//
+// X is mirrored because the webcam behaves
+// like a selfie camera.
+
+const x =
+  (1 - indexFinger.x) *
+  window.innerWidth;
+
+const y =
+  indexFinger.y *
+  window.innerHeight;
+  
+  onCursorUpdate({
+    x,
+    y,
+    visible: true,
+    gesture: gestureResult.gesture,
+  });
+}
 
 const interaction =
   createInteractionEvent(
