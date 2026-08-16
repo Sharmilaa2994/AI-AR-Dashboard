@@ -1,4 +1,7 @@
-import { useState } from "react";
+import {
+  useRef,
+  useState,
+} from "react";
 
 import DashboardCard from "./DashboardCard";
 import PerformanceChart from "./PerformanceChart";
@@ -8,7 +11,7 @@ import ARWidget from "./ARWidget";
 function ARDashboard() {
   const [selectedWidget, setSelectedWidget] =
     useState(null);
-
+  const widgetRefs = useRef({});
   // Step 37.5
   const widgets = [
     {
@@ -116,20 +119,28 @@ function ARDashboard() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 
           {widgets.map((widget) => (
-            <ARWidget
-              key={widget.id}
-              title={widget.title}
-              value={widget.value}
-              description={widget.description}
-              icon={widget.icon}
-              selected={
-                selectedWidget === widget.id
-              }
-              onSelect={() =>
-                setSelectedWidget(widget.id)
-              }
-            />
-          ))}
+  <ARWidget
+    key={widget.id}
+
+    ref={(element) => {
+      widgetRefs.current[widget.id] =
+        element;
+    }}
+
+    title={widget.title}
+    value={widget.value}
+    description={widget.description}
+    icon={widget.icon}
+
+    selected={
+      selectedWidget === widget.id
+    }
+
+    onSelect={() =>
+      setSelectedWidget(widget.id)
+    }
+  />
+))}
 
         </div>
 

@@ -1,75 +1,98 @@
-function ARWidget({
-  title,
-  value,
-  description,
-  icon,
-  selected = false,
-  onSelect,
-}) {
-  return (
-    <div
-      onClick={onSelect}
-      className={`
-        group relative cursor-pointer
-        rounded-2xl border p-5
-        backdrop-blur-xl
-        transition-all duration-300
-        ${
-          selected
-            ? "scale-[1.03] border-cyan-400 bg-cyan-400/10 shadow-lg shadow-cyan-500/20"
-            : "border-slate-700/70 bg-slate-900/60 hover:border-cyan-400/50"
-        }
-      `}
-    >
-      {/* Selection indicator */}
+import { forwardRef } from "react";
 
-      {selected && (
-        <div className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-cyan-400 text-xs font-bold text-slate-950">
-          ✓
-        </div>
-      )}
-
-      {/* Header */}
-
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-slate-400">
-            {title}
-          </p>
-
-          <p className="mt-2 text-3xl font-bold text-white">
-            {value}
-          </p>
-        </div>
-
-        <div className="text-2xl">
-          {icon}
-        </div>
-      </div>
-
-      {/* Description */}
-
-      <p className="mt-3 text-sm text-slate-400">
-        {description}
-      </p>
-
-      {/* AR highlight */}
-
+const ARWidget = forwardRef(
+  (
+    {
+      title,
+      value,
+      description,
+      icon,
+      selected = false,
+      onSelect,
+    },
+    ref
+  ) => {
+    return (
       <div
+        ref={ref}
+        onClick={onSelect}
         className={`
-          pointer-events-none absolute inset-0 rounded-2xl
-          transition-opacity duration-300
+          group relative cursor-pointer
+          overflow-hidden rounded-2xl
+          border p-5
+          backdrop-blur-xl
+          transition-all duration-200
+
           ${
             selected
-              ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100"
+              ? "border-cyan-400 bg-cyan-400/10 shadow-[0_0_30px_rgba(34,211,238,0.18)] scale-[1.02]"
+              : "border-slate-800 bg-slate-900/70 hover:border-cyan-500/40"
           }
         `}
       >
-        <div className="absolute inset-0 rounded-2xl border border-cyan-400/30" />
+
+        {/* Glow */}
+
+        <div
+          className="
+            pointer-events-none
+            absolute -right-10 -top-10
+            h-24 w-24
+            rounded-full
+            bg-cyan-400/10
+            blur-2xl
+          "
+        />
+
+        {/* Header */}
+
+        <div className="relative flex items-center justify-between">
+
+          <div className="text-xs uppercase tracking-wider text-slate-500">
+            {title}
+          </div>
+
+          <div className="text-xl">
+            {icon}
+          </div>
+
+        </div>
+
+        {/* Value */}
+
+        <div className="relative mt-4 text-3xl font-semibold text-white">
+          {value}
+        </div>
+
+        {/* Description */}
+
+        <div className="relative mt-2 text-xs text-slate-500">
+          {description}
+        </div>
+
+        {/* Selection indicator */}
+
+        {selected && (
+          <div className="
+            absolute right-3 bottom-3
+            rounded-full
+            border border-cyan-400/30
+            bg-cyan-400/10
+            px-2 py-1
+            text-[9px]
+            uppercase
+            tracking-wider
+            text-cyan-300
+          ">
+            Selected
+          </div>
+        )}
+
       </div>
-    </div>
-  );
-}
+    );
+  }
+);
+
+ARWidget.displayName = "ARWidget";
 
 export default ARWidget;
