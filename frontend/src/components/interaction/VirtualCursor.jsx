@@ -1,72 +1,66 @@
 function VirtualCursor({
-  x,
-  y,
-  visible,
-  gesture,
+  cursorPosition,
 }) {
-  if (!visible) {
+
+  if (
+    !cursorPosition ||
+    !cursorPosition.visible
+  ) {
     return null;
   }
 
-  const isPinching =
-    gesture === "PINCH";
+
+  const {
+    x,
+    y,
+  } = cursorPosition;
+
+
+  if (
+    typeof x !== "number" ||
+    typeof y !== "number"
+  ) {
+    return null;
+  }
+
 
   return (
     <div
-      className="pointer-events-none fixed z-[9999]"
+      className="
+        pointer-events-none
+        fixed
+        z-[9999]
+        h-6
+        w-6
+        -translate-x-1/2
+        -translate-y-1/2
+        rounded-full
+        border-2
+        border-cyan-300
+        bg-cyan-400/40
+        shadow-[0_0_20px_rgba(34,211,238,0.8)]
+      "
       style={{
         left: `${x}px`,
         top: `${y}px`,
-        transform: "translate(-50%, -50%)",
       }}
     >
-      {/* Outer ring */}
-
-      <div
-        className={`
-          flex h-10 w-10 items-center
-          justify-center rounded-full
-          border-2
-          transition-all duration-100
-          ${
-            isPinching
-              ? "border-purple-400 bg-purple-400/20 scale-75"
-              : "border-cyan-300 bg-cyan-400/10"
-          }
-        `}
-      >
-        {/* Center point */}
-
-        <div
-          className={`
-            h-2.5 w-2.5 rounded-full
-            ${
-              isPinching
-                ? "bg-purple-400"
-                : "bg-cyan-300"
-            }
-          `}
-        />
-      </div>
-
-      {/* Gesture label */}
-
       <div
         className="
-          absolute left-7 top-7
-          whitespace-nowrap rounded-md
-          border border-slate-700
-          bg-slate-950/80
-          px-2 py-1
-          text-[10px]
-          text-slate-300
-          backdrop-blur-md
+          absolute
+          left-1/2
+          top-1/2
+          h-2
+          w-2
+          -translate-x-1/2
+          -translate-y-1/2
+          rounded-full
+          bg-cyan-200
         "
-      >
-        {gesture}
-      </div>
+      />
     </div>
   );
 }
+
 
 export default VirtualCursor;
