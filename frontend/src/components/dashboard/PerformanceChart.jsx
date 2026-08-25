@@ -1,65 +1,85 @@
-
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  subscribePerformance,
+} from "../../services/performance/performanceMonitor";
+
 function PerformanceChart() {
-  // =========================================================
-  // INITIAL PERFORMANCE DATA
-  // =========================================================
-
-  const [data, setData] = useState([
-    42,
-    55,
-    48,
-    68,
-    61,
-    78,
-    72,
-    88,
-    81,
-    94,
-  ]);
 
   // =========================================================
-  // LIVE DATA UPDATE
+  // PERFORMANCE STATE
+  // =========================================================
+
+  const [
+    performance,
+    setPerformance,
+  ] = useState({
+    processing: 0,
+    gestureEvents: 0,
+    cursorEvents: 0,
+    widgetEvents: 0,
+    fps: 0,
+    latency: 0,
+    history: [],
+  });
+
+
+  // =========================================================
+  // SUBSCRIBE TO PERFORMANCE MONITOR
   // =========================================================
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setData((previous) => {
-        const lastValue =
-          previous[previous.length - 1] ?? 50;
 
-        const variation =
-          Math.floor(Math.random() * 15) - 7;
+    const unsubscribe =
+      subscribePerformance(
+        (snapshot) => {
 
-        const nextValue = Math.max(
-          20,
-          Math.min(
-            100,
-            lastValue + variation
-          )
-        );
+          setPerformance(
+            snapshot
+          );
 
-        return [
-          ...previous.slice(1),
-          nextValue,
-        ];
-      });
-    }, 2500);
+        }
+      );
 
-    return () => {
-      clearInterval(interval);
-    };
+    return unsubscribe;
+
   }, []);
+
+
+  // =========================================================
+  // CHART DATA
+  // =========================================================
+
+  const data = useMemo(() => {
+
+    if (
+      !performance.history ||
+      performance.history.length === 0
+    ) {
+      return [0];
+    }
+
+    return performance.history;
+
+  }, [
+    performance.history,
+  ]);
+
 
   // =========================================================
   // CALCULATIONS
   // =========================================================
 
-  const max = Math.max(...data);
+  const max =
+    Math.max(
+      ...data,
+      1
+    );
+
 
   const current =
     data[data.length - 1] ?? 0;
+
 
   const average =
     Math.round(
@@ -70,39 +90,42 @@ function PerformanceChart() {
       ) / data.length
     );
 
+
   const peak =
-    Math.max(...data);
+    Math.max(
+      ...data,
+      0
+    );
+
 
   // =========================================================
   // PERFORMANCE STATUS
   // =========================================================
 
   const performanceStatus =
-    current >= 80
+    performance.fps >= 50
       ? "Excellent"
-      : current >= 60
+      : performance.fps >= 30
       ? "Stable"
-      : "Moderate";
+      : performance.fps > 0
+      ? "Moderate"
+      : "Waiting";
+
 
   // =========================================================
   // TIME LABELS
   // =========================================================
 
-  const timeLabels = useMemo(
-    () => [
-      "10:00",
-      "11:00",
-      "12:00",
-      "13:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00",
-      "18:00",
-      "Now",
-    ],
-    []
-  );
+  const timeLabels =
+    useMemo(() => {
+
+      return data.map(
+        (_, index) =>
+          `${index + 1}`
+      );
+
+    }, [data]);
+
 
   // =========================================================
   // RENDER
@@ -120,9 +143,7 @@ function PerformanceChart() {
       "
     >
 
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
 
       <div
         className="
@@ -217,9 +238,7 @@ function PerformanceChart() {
       </div>
 
 
-      {/* =====================================================
-          METRICS
-      ====================================================== */}
+      {/* METRICS */}
 
       <div
         className="
@@ -261,13 +280,13 @@ function PerformanceChart() {
               text-cyan-300
             "
           >
-            {current}%
+            {current} ms
           </div>
 
         </div>
 
 
-        {/* AVERAGE */}
+        {/* FPS */}
 
         <div
           className="
@@ -287,7 +306,7 @@ function PerformanceChart() {
               text-slate-500
             "
           >
-            Average
+            FPS
           </div>
 
           <div
@@ -298,13 +317,13 @@ function PerformanceChart() {
               text-purple-300
             "
           >
-            {average}%
+            {performance.fps}
           </div>
 
         </div>
 
 
-        {/* PEAK */}
+        {/* LATENCY */}
 
         <div
           className="
@@ -324,7 +343,7 @@ function PerformanceChart() {
               text-slate-500
             "
           >
-            Peak
+            Latency
           </div>
 
           <div
@@ -335,7 +354,7 @@ function PerformanceChart() {
               text-emerald-300
             "
           >
-            {peak}%
+            {performance.latency} ms
           </div>
 
         </div>
@@ -343,9 +362,7 @@ function PerformanceChart() {
       </div>
 
 
-      {/* =====================================================
-          PERFORMANCE STATUS
-      ====================================================== */}
+      {/* PERFORMANCE STATUS */}
 
       <div
         className="
@@ -378,9 +395,7 @@ function PerformanceChart() {
       </div>
 
 
-      {/* =====================================================
-          CHART
-      ====================================================== */}
+      {/* CHART */}
 
       <div
         className="
@@ -395,7 +410,10 @@ function PerformanceChart() {
           (value, index) => {
 
             const percentage =
-              (value / max) * 100;
+              Math.max(
+                5,
+                (value / max) * 100
+              );
 
             const isCurrent =
               index ===
@@ -429,7 +447,7 @@ function PerformanceChart() {
                     group-hover:block
                   "
                 >
-                  {value}%
+                  {value} ms
                 </span>
 
 
@@ -440,7 +458,7 @@ function PerformanceChart() {
                     w-full
                     rounded-t-md
                     transition-all
-                    duration-700
+                    duration-300
                     ease-out
                     ${
                       isCurrent
@@ -456,15 +474,14 @@ function PerformanceChart() {
 
               </div>
             );
+
           }
         )}
 
       </div>
 
 
-      {/* =====================================================
-          TIME AXIS
-      ====================================================== */}
+      {/* TIME AXIS */}
 
       <div
         className="
@@ -487,16 +504,16 @@ function PerformanceChart() {
       </div>
 
 
-      {/* =====================================================
-          FOOTER
-      ====================================================== */}
+      {/* FOOTER */}
 
       <div
         className="
           mt-5
           flex
+          flex-wrap
           items-center
           justify-between
+          gap-3
           border-t
           border-slate-800
           pt-4
@@ -530,11 +547,25 @@ function PerformanceChart() {
 
         <div
           className="
+            flex
+            gap-4
             text-[10px]
             text-slate-600
           "
         >
-          Updates every 2.5s
+
+          <span>
+            Gestures: {performance.gestureEvents}
+          </span>
+
+          <span>
+            Cursor: {performance.cursorEvents}
+          </span>
+
+          <span>
+            Widgets: {performance.widgetEvents}
+          </span>
+
         </div>
 
       </div>

@@ -114,12 +114,35 @@ export const recordFrame = (
   }
 
 
-  performanceState.latency =
-    Math.round(
-      Number(processingTime) || 0
-    );
+  const frameProcessingTime =
+  Math.round(
+    Number(processingTime) || 0
+  );
 
-  notifyListeners();
+performanceState.latency =
+  frameProcessingTime;
+
+
+performanceState.history.push(
+  frameProcessingTime
+);
+
+
+if (
+  performanceState.history.length >
+  MAX_HISTORY
+) {
+
+  performanceState.history.shift();
+
+}
+
+
+performanceState.processing =
+  frameProcessingTime;
+
+
+notifyListeners();
 };
 
 

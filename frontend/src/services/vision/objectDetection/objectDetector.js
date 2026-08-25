@@ -1,18 +1,9 @@
-// ============================================================
-// OBJECT DETECTION SERVICE
-// ============================================================
-//
-// Responsible for:
-// 1. Initializing object detection
-// 2. Processing camera frames
-// 3. Returning detected objects
-// 4. Providing a clean interface for AR overlays
-//
-// Current stage:
-// Detection pipeline preparation
-// ============================================================
+import {
+  FilesetResolver,
+  ObjectDetector,
+} from "@mediapipe/tasks-vision";
 
-let initialized = false;
+let objectDetector = null;
 
 
 // ============================================================
@@ -21,7 +12,7 @@ let initialized = false;
 
 export async function initializeObjectDetection() {
 
-  if (initialized) {
+  if (objectDetector) {
     return {
       status: "ready",
       message: "Object detection already initialized",
@@ -34,14 +25,34 @@ export async function initializeObjectDetection() {
       "Initializing object detection..."
     );
 
-    // Object detection model will be connected
-    // in the next stage.
+    const vision =
+      await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
+      );
 
-    initialized = true;
+
+    objectDetector =
+      await ObjectDetector.createFromOptions(
+        vision,
+        {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/1/efficientdet_lite0.tflite",
+          },
+
+          runningMode: "VIDEO",
+
+          maxResults: 5,
+
+          scoreThreshold: 0.4,
+        }
+      );
+
 
     console.log(
       "Object detection service initialized"
     );
+
 
     return {
       status: "ready",
@@ -55,7 +66,8 @@ export async function initializeObjectDetection() {
       error
     );
 
-    initialized = false;
+    objectDetector =
+      null;
 
     throw error;
   }
@@ -66,17 +78,19 @@ export async function initializeObjectDetection() {
 // DETECT OBJECTS
 // ============================================================
 
-export async function detectObjects(
-  videoElement
+export function detectObjects(
+  videoElement,
+  timestamp
 ) {
 
-  if (!initialized) {
+  if (!objectDetector) {
 
     return {
       objects: [],
       status: "not_initialized",
     };
   }
+
 
   if (!videoElement) {
 
@@ -87,18 +101,95 @@ export async function detectObjects(
   }
 
 
-  // ----------------------------------------------------------
-  // Temporary response
-  // ----------------------------------------------------------
-  //
-  // The actual computer-vision model will be connected next.
-  //
+  if (
+    videoElement.readyState < 2 ||
+    videoElement.videoWidth <= 0 ||
+    videoElement.videoHeight <= 0
+  ) {
 
-  return {
-    objects: [],
-    status: "ready",
-    timestamp: performance.now(),
-  };
+    return {
+      objects: [],
+      status: "video_not_ready",
+    };
+  }
+
+
+  try {
+
+    const result =
+      objectDetector.detectForVideo(
+        videoElement,
+        timestamp
+      );
+
+
+    const detections =
+      result?.detections || [];
+
+
+    const objects =
+      detections.map(
+        (detection) => {
+
+          const category =
+            detection.categories?.[0];
+
+          const boundingBox =
+            detection.boundingBox;
+
+
+          return {
+            label:
+              category?.categoryName ||
+              "unknown",
+
+            confidence:
+              Number(
+                category?.score
+              ) || 0,
+
+            boundingBox: boundingBox
+              ? {
+                  originX:
+                    boundingBox.originX,
+
+                  originY:
+                    boundingBox.originY,
+
+                  width:
+                    boundingBox.width,
+
+                  height:
+                    boundingBox.height,
+                }
+              : null,
+          };
+        }
+      );
+
+
+    return {
+      objects,
+      status: "ready",
+      timestamp,
+    };
+
+  } catch (error) {
+
+    console.error(
+      "Object detection failed:",
+      error
+    );
+
+
+    return {
+      objects: [],
+      status: "error",
+      error:
+        error?.message ||
+        "Object detection failed",
+    };
+  }
 }
 
 
@@ -108,7 +199,14 @@ export async function detectObjects(
 
 export function resetObjectDetection() {
 
-  initialized = false;
+  if (objectDetector) {
+
+    objectDetector.close();
+
+    objectDetector =
+      null;
+  }
+
 
   console.log(
     "Object detection service reset"
@@ -122,5 +220,5 @@ export function resetObjectDetection() {
 
 export function isObjectDetectionReady() {
 
-  return initialized;
+  return objectDetector !== null;
 }

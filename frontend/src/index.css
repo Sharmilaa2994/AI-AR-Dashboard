@@ -20,3 +20,365 @@ body {
   background: #0b0f19;
   color: white;
 }
+@keyframes scan {
+  0% {
+    transform: translateY(-10vh);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(110vh);
+    opacity: 0;
+  }
+}
+
+/* =========================================================
+   AR DASHBOARD — FUTURISTIC HUD ANIMATIONS
+   ========================================================= */
+
+@keyframes ar-grid-move {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+@keyframes ar-scan-line {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+
+  90% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+@keyframes ar-pulse-glow {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes ar-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes ar-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ar-border-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
+
+
+/* =========================================================
+   UTILITY CLASSES
+   ========================================================= */
+
+.ar-grid-animation {
+  animation: ar-grid-move 18s linear infinite;
+}
+
+.ar-scan-animation {
+  animation: ar-scan-line 8s linear infinite;
+}
+
+.ar-pulse-glow {
+  animation: ar-pulse-glow 5s ease-in-out infinite;
+}
+
+.ar-float {
+  animation: ar-float 6s ease-in-out infinite;
+}
+
+.ar-fade-up {
+  animation: ar-fade-up 0.8s ease-out both;
+}
+
+.ar-border-pulse {
+  animation: ar-border-pulse 3s ease-in-out infinite;
+}
+
+
+/* =========================================================
+   STAGGERED DASHBOARD ANIMATION
+   ========================================================= */
+
+.ar-delay-1 {
+  animation-delay: 0.1s;
+}
+
+.ar-delay-2 {
+  animation-delay: 0.2s;
+}
+
+.ar-delay-3 {
+  animation-delay: 0.3s;
+}
+
+.ar-delay-4 {
+  animation-delay: 0.4s;
+}
+
+.ar-delay-5 {
+  animation-delay: 0.5s;
+}
+
+.ar-delay-6 {
+  animation-delay: 0.6s;
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(180px);
+    opacity: 0;
+  }
+}
+
+@keyframes arScan {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+/* =========================================================
+   AR DASHBOARD ANIMATIONS
+========================================================= */
+
+@keyframes arScan {
+  0% {
+    transform: translateY(-10vh);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(110vh);
+    opacity: 0;
+  }
+}
+
+@keyframes arFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.35;
+  }
+
+  50% {
+    transform: translate3d(0, -18px, 0);
+    opacity: 1;
+  }
+}
+
+/* =========================================
+   AR WIDGET ENTRANCE ANIMATION
+========================================= */
+
+@keyframes arFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ar-fade-up {
+  animation: arFadeUp 0.7s ease-out both;
+}
+
+/* =========================================================
+   FUTURISTIC AR BACKGROUND
+========================================================= */
+
+@keyframes arScan {
+  0% {
+    transform: translateY(-10vh);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(100vh);
+    opacity: 0;
+  }
+}
+
+@keyframes arGlow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scale(1.12);
+    opacity: 0.75;
+  }
+}
+
+@keyframes arGridPulse {
+  0%,
+  100% {
+    opacity: 0.04;
+  }
+
+  50% {
+    opacity: 0.09;
+  }
+}
+
+.ar-scan {
+  animation: arScan 7s linear infinite;
+}
+
+.ar-glow {
+  animation: arGlow 8s ease-in-out infinite;
+}
+
+.ar-grid-pulse {
+  animation: arGridPulse 6s ease-in-out infinite;
+}

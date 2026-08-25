@@ -1,0 +1,61 @@
+Folder PATH listing for volume Windows
+Volume serial number is 000001AA 8043:BA5D
+C:\USERS\SHARM\SKAIQUANT TECH\AI-AR-DASHBOARD\FRONTEND\SRC
+¦   App.jsx
+¦   index.css
+¦   main.jsx
+¦   
++---assets
++---components
+¦   +---common
+¦   ¦       Navbar.jsx
+¦   ¦       Sidebar.jsx
+¦   ¦       
+¦   +---dashboard
+¦   ¦       ARDashboard.jsx
+¦   ¦       ARWidget.jsx
+¦   ¦       ARWidgetDetail.jsx
+¦   ¦       DashboardCard.jsx
+¦   ¦       PerformanceChart.jsx
+¦   ¦       StatusCard.jsx
+¦   ¦       SystemStatus.jsx
+¦   ¦       WidgetActionPanel.jsx
+¦   ¦       Workspace.jsx
+¦   ¦       
+¦   +---gesture
+¦   ¦       GestureStatus.jsx
+¦   ¦       
+¦   +---interaction
+¦   ¦       VirtualCursor.jsx
+¦   ¦       
+¦   +---ui
+¦   +---vision
+¦   ¦       CameraFeed.jsx
+¦   ¦       
+¦   +---workspace
+¦           ARWorkspace.jsx
+¦           
++---context
++---hooks
++---layouts
++---pages
+¦       Dashboard.jsx
+¦       
++---services
+¦   +---interaction
+¦   ¦       interactionController.js
+¦   ¦       widgetActions.js
+¦   ¦       widgetTargeting.js
+¦   ¦       
+¦   +---performance
+¦   ¦       performanceMonitor.js
+¦   ¦       
+¦   +---vision
+¦       ¦   gestureEngine.js
+¦       ¦   handTracking.js
+¦       ¦   
+¦       +---objectDetection
+¦               objectDetector.js
+¦               
++---three
++---utils
