@@ -1,0 +1,3638 @@
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  Activity,
+  AlertTriangle,
+  BrainCircuit,
+  CheckCircle2,
+  ChevronRight,
+  Cpu,
+  Gauge,
+  Hand,
+  Layers3,
+  Radio,
+  RefreshCw,
+  ScanLine,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Zap,
+} from "lucide-react";
+
+import PerformanceChart from "./PerformanceChart";
+import SystemStatus from "./SystemStatus";
+import ARWidget from "./ARWidget";
+import WidgetActionPanel from "./WidgetActionPanel";
+import ARWidgetDetail from "./ARWidgetDetail";
+import AdvancedDashboardCore from "./AdvancedDashboardCore";
+
+import GestureStatus from "../gesture/GestureStatus";
+
+import {
+  findTargetWidget,
+} from "../../services/interaction/widgetTargeting";
+
+import {
+  executeWidgetAction,
+} from "../../services/interaction/widgetActions";
+
+import {
+  useDashboardData,
+} from "../../hooks/useDashboardData";
+
+import {
+  getVisionStatus,
+  getVisionPipeline,
+} from "../../services/api/visionApi";
+
+import {
+  recordGesture,
+  recordWidgetEvent,
+} from "../../services/performance/performanceMonitor";
+
+
+// ============================================================
+// STATUS PILL
+// ============================================================
+
+function StatusPill({
+  status,
+  label,
+}) {
+  const normalized = String(
+    status || ""
+  ).toUpperCase();
+
+  const online =
+    normalized === "ONLINE" ||
+    normalized === "READY" ||
+    normalized === "ACTIVE" ||
+    normalized === "AVAILABLE" ||
+    normalized === "INITIALIZED" ||
+    normalized === "TRUE";
+
+  const connecting =
+    normalized === "CONNECTING" ||
+    normalized === "INITIALIZING" ||
+    normalized === "SYNC" ||
+    normalized === "WAITING" ||
+    normalized === "STANDBY" ||
+    normalized === "LOADING";
+
+  return (
+    <div
+      className={`
+        inline-flex
+        min-w-0
+        items-center
+        justify-center
+        gap-1.5
+        rounded-full
+        border
+        px-2.5
+        py-1.5
+        text-[8px]
+        font-medium
+        uppercase
+        tracking-[0.12em]
+        whitespace-nowrap
+        sm:text-[9px]
+        ${
+          online
+            ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-300"
+            : connecting
+            ? "border-amber-400/20 bg-amber-400/5 text-amber-300"
+            : "border-red-400/20 bg-red-400/5 text-red-300"
+        }
+      `}
+    >
+      <span
+        className={`
+          h-1.5
+          w-1.5
+          shrink-0
+          rounded-full
+          ${
+            online
+              ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+              : connecting
+              ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+              : "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)]"
+          }
+        `}
+      />
+
+      <span className="truncate">
+        {label || status || "UNKNOWN"}
+      </span>
+    </div>
+  );
+}
+
+
+// ============================================================
+// SECTION HEADER
+// ============================================================
+
+function SectionHeader({
+  icon: Icon,
+  eyebrow,
+  title,
+  right,
+}) {
+  return (
+    <div
+      className="
+        mb-4
+        flex
+        min-w-0
+        flex-wrap
+        items-center
+        justify-between
+        gap-3
+      "
+    >
+      <div
+        className="
+          flex
+          min-w-0
+          items-center
+          gap-3
+        "
+      >
+        <div
+          className="
+            flex
+            h-9
+            w-9
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            border
+            border-cyan-400/15
+            bg-cyan-400/5
+          "
+        >
+          <Icon
+            size={16}
+            className="text-cyan-300"
+          />
+        </div>
+
+        <div className="min-w-0">
+          <div
+            className="
+              truncate
+              text-[9px]
+              uppercase
+              tracking-[0.22em]
+              text-cyan-400/70
+            "
+          >
+            {eyebrow}
+          </div>
+
+          <div
+            className="
+              mt-0.5
+              truncate
+              text-sm
+              font-semibold
+              text-white
+            "
+          >
+            {title}
+          </div>
+        </div>
+      </div>
+
+      {right && (
+        <div className="shrink-0">
+          {right}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ============================================================
+// MINI METRIC
+// ============================================================
+
+function MiniMetric({
+  label,
+  value,
+  icon: Icon,
+  accent = "cyan",
+}) {
+  const accentClasses = {
+    cyan:
+      "text-cyan-300 border-cyan-400/10 bg-cyan-400/5",
+    purple:
+      "text-purple-300 border-purple-400/10 bg-purple-400/5",
+    emerald:
+      "text-emerald-300 border-emerald-400/10 bg-emerald-400/5",
+    amber:
+      "text-amber-300 border-amber-400/10 bg-amber-400/5",
+    rose:
+      "text-rose-300 border-rose-400/10 bg-rose-400/5",
+  };
+
+  return (
+    <div
+      className={`
+        min-w-0
+        rounded-2xl
+        border
+        bg-slate-950/60
+        p-3
+        transition
+        duration-300
+        hover:border-white/10
+        sm:p-4
+        ${accentClasses[accent] || accentClasses.cyan}
+      `}
+    >
+      <div
+        className="
+          flex
+          items-center
+          justify-between
+          gap-2
+        "
+      >
+        <span
+          className="
+            min-w-0
+            truncate
+            text-[8px]
+            uppercase
+            tracking-[0.16em]
+            text-slate-500
+            sm:text-[9px]
+          "
+        >
+          {label}
+        </span>
+
+        <Icon
+          size={14}
+          className="shrink-0"
+        />
+      </div>
+
+      <div
+        className="
+          mt-2
+          truncate
+          text-xl
+          font-semibold
+          tracking-tight
+          text-white
+          sm:mt-3
+          sm:text-2xl
+        "
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// PIPELINE CARD
+// ============================================================
+
+function PipelineCard({
+  label,
+  value,
+  icon: Icon,
+  accent = "cyan",
+}) {
+  const accentMap = {
+    cyan: {
+      icon: "text-cyan-400",
+      value: "text-cyan-300",
+    },
+    purple: {
+      icon: "text-purple-400",
+      value: "text-purple-300",
+    },
+    emerald: {
+      icon: "text-emerald-400",
+      value: "text-emerald-300",
+    },
+    amber: {
+      icon: "text-amber-400",
+      value: "text-amber-300",
+    },
+  };
+
+  const colors =
+    accentMap[accent] || accentMap.cyan;
+
+  return (
+    <div
+      className="
+        min-w-0
+        rounded-2xl
+        border
+        border-white/5
+        bg-black/20
+        p-3
+        transition
+        duration-300
+        hover:border-white/10
+        sm:p-4
+      "
+    >
+      <div
+        className="
+          flex
+          items-center
+          justify-between
+          gap-2
+        "
+      >
+        <span
+          className="
+            min-w-0
+            truncate
+            text-[8px]
+            uppercase
+            tracking-wider
+            text-slate-500
+            sm:text-[9px]
+          "
+        >
+          {label}
+        </span>
+
+        <Icon
+          size={14}
+          className={`shrink-0 ${colors.icon}`}
+        />
+      </div>
+
+      <div
+        className={`
+          mt-2
+          truncate
+          text-xs
+          font-medium
+          sm:mt-3
+          sm:text-sm
+          ${colors.value}
+        `}
+      >
+        {value || "WAITING"}
+      </div>
+    </div>
+  );
+}
+
+
+// ============================================================
+// AR DASHBOARD
+// ============================================================
+
+function ARDashboard({
+  cursorPosition,
+}) {
+  // ==========================================================
+  // STATE
+  // ==========================================================
+
+  const [
+    selectedWidget,
+    setSelectedWidget,
+  ] = useState(null);
+
+  const [
+    hoveredWidget,
+    setHoveredWidget,
+  ] = useState(null);
+
+  const [
+    interactionMessage,
+    setInteractionMessage,
+  ] = useState(
+    "Point at a widget"
+  );
+
+  const [
+    activeAction,
+    setActiveAction,
+  ] = useState(null);
+
+  const [
+    interactionCount,
+    setInteractionCount,
+  ] = useState(0);
+
+  const [
+    gestureStats,
+    setGestureStats,
+  ] = useState({
+    POINT: 0,
+    PINCH: 0,
+    TWO_FINGER: 0,
+    FIST: 0,
+    OPEN_PALM: 0,
+  });
+
+  const [
+    lastInteraction,
+    setLastInteraction,
+  ] = useState(
+    "Waiting for gesture..."
+  );
+
+  const [
+    backendStatus,
+    setBackendStatus,
+  ] = useState("CONNECTING");
+
+  const [
+    visionStatus,
+    setVisionStatus,
+  ] = useState(null);
+
+  const [
+    pipelineStatus,
+    setPipelineStatus,
+  ] = useState(null);
+
+  const [
+    backendError,
+    setBackendError,
+  ] = useState(null);
+
+  const [
+    refreshPulse,
+    setRefreshPulse,
+  ] = useState(false);
+
+
+  // ==========================================================
+  // DASHBOARD DATA
+  // ==========================================================
+
+  const {
+    data: dashboardData,
+    loading: dashboardLoading,
+    error: dashboardError,
+  } = useDashboardData();
+
+
+  // ==========================================================
+  // REFS
+  // ==========================================================
+
+  const widgetRefs =
+    useRef({});
+
+  const hoveredWidgetRef =
+    useRef(null);
+
+  const selectedWidgetRef =
+    useRef(null);
+
+  const previousGestureRef =
+    useRef("UNKNOWN");
+
+  const gestureLockRef =
+    useRef({
+      PINCH: false,
+      FIST: false,
+      OPEN_PALM: false,
+      TWO_FINGER: false,
+    });
+
+  const cooldownRef =
+    useRef({
+      PINCH: false,
+      FIST: false,
+      OPEN_PALM: false,
+      TWO_FINGER: false,
+    });
+
+  const timerRef =
+    useRef({
+      PINCH: null,
+      FIST: null,
+      OPEN_PALM: null,
+      TWO_FINGER: null,
+    });
+
+  const refreshTimerRef =
+    useRef(null);
+
+
+  // ==========================================================
+  // DERIVED DATA
+  // ==========================================================
+
+  const currentGesture = String(
+    cursorPosition?.gesture ||
+      "UNKNOWN"
+  ).toUpperCase();
+
+  const confidence = Math.round(
+    Math.max(
+      0,
+      Math.min(
+        1,
+        Number(
+          cursorPosition?.confidence || 0
+        )
+      )
+    ) * 100
+  );
+
+  const cursorActive = Boolean(
+    cursorPosition?.visible
+  );
+
+  const systemLoad =
+    dashboardData?.system_load ?? 0;
+
+  const processingRate =
+    dashboardData?.processing_rate ?? 0;
+
+  const activeUsers =
+    dashboardData?.active_users ?? "—";
+
+
+  const totalGestures =
+    Object.values(
+      gestureStats
+    ).reduce(
+      (sum, value) =>
+        sum + Number(value || 0),
+      0
+    );
+
+
+  const healthScore =
+    backendStatus === "ONLINE" &&
+    visionStatus
+      ? 96
+      : backendStatus === "CONNECTING"
+      ? 82
+      : 58;
+
+
+  // ==========================================================
+  // GESTURE DISTRIBUTION
+  // ==========================================================
+
+  const gestureDistribution =
+    useMemo(
+      () => [
+        {
+          key: "POINT",
+          label: "Point",
+          icon: "☝",
+          value:
+            gestureStats.POINT || 0,
+          className:
+            "text-cyan-300",
+          bar:
+            "bg-cyan-400",
+        },
+        {
+          key: "PINCH",
+          label: "Pinch",
+          icon: "🤏",
+          value:
+            gestureStats.PINCH || 0,
+          className:
+            "text-purple-300",
+          bar:
+            "bg-purple-400",
+        },
+        {
+          key: "TWO_FINGER",
+          label: "Two",
+          icon: "✌",
+          value:
+            gestureStats.TWO_FINGER || 0,
+          className:
+            "text-amber-300",
+          bar:
+            "bg-amber-400",
+        },
+        {
+          key: "FIST",
+          label: "Fist",
+          icon: "✊",
+          value:
+            gestureStats.FIST || 0,
+          className:
+            "text-rose-300",
+          bar:
+            "bg-rose-400",
+        },
+        {
+          key: "OPEN_PALM",
+          label: "Palm",
+          icon: "✋",
+          value:
+            gestureStats.OPEN_PALM || 0,
+          className:
+            "text-emerald-300",
+          bar:
+            "bg-emerald-400",
+        },
+      ],
+      [gestureStats]
+    );
+
+
+  // ==========================================================
+  // GESTURE TELEMETRY
+  // ==========================================================
+
+  const recordGestureEvent =
+    useCallback(
+      (gesture) => {
+        if (!gesture) {
+          return;
+        }
+
+        const normalizedGesture =
+          String(
+            gesture
+          ).toUpperCase();
+
+        setGestureStats(
+          (stats) => ({
+            ...stats,
+            [normalizedGesture]:
+              (
+                stats[
+                  normalizedGesture
+                ] || 0
+              ) + 1,
+          })
+        );
+
+        recordGesture(
+          normalizedGesture
+        );
+
+        if (import.meta.env.DEV) {
+          console.log(
+            "AR GESTURE DETECTED:",
+            {
+              gesture:
+                normalizedGesture,
+              timestamp:
+                new Date().toISOString(),
+            }
+          );
+        }
+      },
+      []
+    );
+
+
+  // ==========================================================
+  // SUCCESSFUL INTERACTION TELEMETRY
+  // ==========================================================
+
+  const recordInteraction =
+    useCallback(
+      (
+        gesture,
+        message
+      ) => {
+        if (!gesture) {
+          return;
+        }
+
+        const normalizedGesture =
+          String(
+            gesture
+          ).toUpperCase();
+
+        setInteractionCount(
+          (count) => count + 1
+        );
+
+        setLastInteraction(
+          `${normalizedGesture}: ${message}`
+        );
+
+        if (import.meta.env.DEV) {
+          console.log(
+            "AR INTERACTION:",
+            {
+              gesture:
+                normalizedGesture,
+              message,
+              timestamp:
+                new Date().toISOString(),
+            }
+          );
+        }
+      },
+      []
+    );
+
+
+  // ==========================================================
+  // BACKEND CONNECTION
+  // ==========================================================
+
+  const loadBackendStatus =
+    useCallback(
+      async () => {
+        try {
+          const [
+            vision,
+            pipeline,
+          ] = await Promise.all([
+            getVisionStatus(),
+            getVisionPipeline(),
+          ]);
+
+          setVisionStatus(
+            vision
+          );
+
+          setPipelineStatus(
+            pipeline
+          );
+
+          setBackendStatus(
+            "ONLINE"
+          );
+
+          setBackendError(
+            null
+          );
+
+          return true;
+        } catch (error) {
+          console.error(
+            "BACKEND STATUS ERROR:",
+            error
+          );
+
+          setBackendStatus(
+            "OFFLINE"
+          );
+
+          setBackendError(
+            error?.message ||
+              "Backend unavailable"
+          );
+
+          return false;
+        }
+      },
+      []
+    );
+
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initialize =
+      async () => {
+        if (!mounted) {
+          return;
+        }
+
+        await loadBackendStatus();
+      };
+
+    initialize();
+
+    const interval =
+      setInterval(
+        () => {
+          if (mounted) {
+            loadBackendStatus();
+          }
+        },
+        5000
+      );
+
+    return () => {
+      mounted = false;
+      clearInterval(
+        interval
+      );
+    };
+  }, [
+    loadBackendStatus,
+  ]);
+
+
+  // ==========================================================
+  // MANUAL REFRESH
+  // ==========================================================
+
+  const refreshSystem =
+    useCallback(
+      async () => {
+        setRefreshPulse(
+          true
+        );
+
+        if (
+          refreshTimerRef.current
+        ) {
+          clearTimeout(
+            refreshTimerRef.current
+          );
+        }
+
+        refreshTimerRef.current =
+          setTimeout(
+            () => {
+              setRefreshPulse(
+                false
+              );
+            },
+            700
+          );
+
+        await loadBackendStatus();
+      },
+      [
+        loadBackendStatus,
+      ]
+    );
+
+
+  // ==========================================================
+  // WIDGET DATA
+  // ==========================================================
+
+  const widgets = useMemo(
+    () => [
+      {
+        id: "users",
+        title: "Active Users",
+        value:
+          dashboardData?.active_users ??
+          "—",
+        description:
+          "+12.8% from previous period",
+        icon: "👥",
+      },
+      {
+        id: "load",
+        title: "System Load",
+        value:
+          dashboardData
+            ? `${dashboardData.system_load}%`
+            : "—",
+        description:
+          "Current system utilization",
+        icon: "⚡",
+      },
+      {
+        id: "processing",
+        title: "Processing Rate",
+        value:
+          dashboardData
+            ? `${dashboardData.processing_rate}%`
+            : "—",
+        description:
+          "Vision pipeline efficiency",
+        icon: "◈",
+      },
+      {
+        id: "interactions",
+        title: "Interactions",
+        value:
+          interactionCount.toLocaleString(),
+        description:
+          "Gesture events processed",
+        icon: "✋",
+      },
+    ],
+    [
+      dashboardData,
+      interactionCount,
+    ]
+  );
+
+
+  // ==========================================================
+  // SELECT WIDGET
+  // ==========================================================
+
+  const selectWidget =
+    useCallback(
+      (widgetId) => {
+        if (!widgetId) {
+          return;
+        }
+
+        selectedWidgetRef.current =
+          widgetId;
+
+        setSelectedWidget(
+          widgetId
+        );
+      },
+      []
+    );
+
+
+  // ==========================================================
+  // CLEAR SELECTION
+  // ==========================================================
+
+  const clearSelection =
+    useCallback(
+      () => {
+        selectedWidgetRef.current =
+          null;
+
+        setSelectedWidget(
+          null
+        );
+      },
+      []
+    );
+
+
+  // ==========================================================
+  // HOVER UPDATE
+  // ==========================================================
+
+  const updateHoveredWidget =
+    useCallback(
+      (widgetId) => {
+        if (
+          hoveredWidgetRef.current ===
+          widgetId
+        ) {
+          return;
+        }
+
+        hoveredWidgetRef.current =
+          widgetId;
+
+        setHoveredWidget(
+          widgetId
+        );
+      },
+      []
+    );
+
+
+  // ==========================================================
+  // FIND CURRENT TARGET
+  // ==========================================================
+
+  const findCurrentTarget =
+    useCallback(
+      () => {
+        if (!cursorPosition) {
+          return null;
+        }
+
+        if (
+          typeof cursorPosition.x !==
+            "number" ||
+          typeof cursorPosition.y !==
+            "number"
+        ) {
+          return null;
+        }
+
+        return findTargetWidget(
+          cursorPosition.x,
+          cursorPosition.y,
+          widgetRefs.current
+        );
+      },
+      [cursorPosition]
+    );
+
+
+  // ==========================================================
+  // POINT TARGETING
+  // ==========================================================
+
+  useEffect(() => {
+    if (!cursorPosition) {
+      updateHoveredWidget(
+        null
+      );
+
+      return;
+    }
+
+    const visible =
+      Boolean(
+        cursorPosition.visible
+      );
+
+    const gesture =
+      String(
+        cursorPosition.gesture ||
+          "UNKNOWN"
+      ).toUpperCase();
+
+    if (
+      !visible ||
+      gesture !== "POINT"
+    ) {
+      updateHoveredWidget(
+        null
+      );
+
+      return;
+    }
+
+    const x =
+      cursorPosition.x;
+
+    const y =
+      cursorPosition.y;
+
+    if (
+      typeof x !== "number" ||
+      typeof y !== "number"
+    ) {
+      updateHoveredWidget(
+        null
+      );
+
+      return;
+    }
+
+    const target =
+      findTargetWidget(
+        x,
+        y,
+        widgetRefs.current
+      );
+
+    updateHoveredWidget(
+      target
+    );
+  }, [
+    cursorPosition?.x,
+    cursorPosition?.y,
+    cursorPosition?.visible,
+    cursorPosition?.gesture,
+    updateHoveredWidget,
+  ]);
+
+
+  // ==========================================================
+  // PROCESS PINCH
+  // ==========================================================
+
+  const processPinch =
+    useCallback(
+      () => {
+        const target =
+          hoveredWidgetRef.current ||
+          findCurrentTarget();
+
+        if (!target) {
+          setInteractionMessage(
+            "Point at a widget before pinching."
+          );
+
+          return;
+        }
+
+        selectWidget(
+          target
+        );
+
+        setInteractionMessage(
+          `${target} selected`
+        );
+
+        recordInteraction(
+          "PINCH",
+          `${target} selected`
+        );
+      },
+      [
+        findCurrentTarget,
+        selectWidget,
+        recordInteraction,
+      ]
+    );
+
+
+  // ==========================================================
+  // PROCESS FIST
+  // ==========================================================
+
+  const processFist =
+    useCallback(
+      () => {
+        const selected =
+          selectedWidgetRef.current;
+
+        if (selected) {
+          setActiveAction(
+            null
+          );
+
+          clearSelection();
+
+          setInteractionMessage(
+            "Widget closed"
+          );
+
+          recordInteraction(
+            "FIST",
+            "Widget closed"
+          );
+        } else {
+          setInteractionMessage(
+            "No selected widget to close."
+          );
+        }
+      },
+      [
+        clearSelection,
+        recordInteraction,
+      ]
+    );
+
+
+  // ==========================================================
+  // PROCESS OPEN PALM
+  // ==========================================================
+
+  const processOpenPalm =
+    useCallback(
+      () => {
+        setActiveAction(
+          null
+        );
+
+        clearSelection();
+
+        updateHoveredWidget(
+          null
+        );
+
+        setInteractionMessage(
+          "Interaction reset"
+        );
+
+        recordInteraction(
+          "OPEN_PALM",
+          "Interaction reset"
+        );
+      },
+      [
+        clearSelection,
+        updateHoveredWidget,
+        recordInteraction,
+      ]
+    );
+
+
+  // ==========================================================
+  // PROCESS TWO FINGER
+  // ==========================================================
+
+  const processTwoFinger =
+    useCallback(
+      () => {
+        const selected =
+          selectedWidgetRef.current;
+
+        if (!selected) {
+          setInteractionMessage(
+            "Select a widget with PINCH first."
+          );
+
+          return;
+        }
+
+        const action =
+          executeWidgetAction(
+            selected
+          );
+
+        if (!action) {
+          setInteractionMessage(
+            `${selected} secondary action unavailable`
+          );
+
+          return;
+        }
+
+        recordWidgetEvent(
+          selected,
+          "secondary_action"
+        );
+
+        setActiveAction(
+          action
+        );
+
+        const message =
+          action.message ||
+          `${selected} secondary action`;
+
+        setInteractionMessage(
+          message
+        );
+
+        recordInteraction(
+          "TWO_FINGER",
+          message
+        );
+      },
+      [
+        recordInteraction,
+      ]
+    );
+
+
+  // ==========================================================
+  // GESTURE ENGINE
+  // ==========================================================
+
+  useEffect(() => {
+    if (!cursorPosition) {
+      return;
+    }
+
+    const gesture =
+      String(
+        cursorPosition.gesture ||
+          "UNKNOWN"
+      ).toUpperCase();
+
+    const visible =
+      Boolean(
+        cursorPosition.visible
+      );
+
+
+    // --------------------------------------------------------
+    // Record gesture transitions
+    // --------------------------------------------------------
+
+    if (
+      visible &&
+      gesture !== "UNKNOWN" &&
+      previousGestureRef.current !==
+        gesture
+    ) {
+      recordGestureEvent(
+        gesture
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // Reset locks when tracking stops
+    // --------------------------------------------------------
+
+    if (
+      !visible &&
+      gesture === "UNKNOWN"
+    ) {
+      Object.keys(
+        gestureLockRef.current
+      ).forEach(
+        (key) => {
+          gestureLockRef.current[key] =
+            false;
+        }
+      );
+
+      previousGestureRef.current =
+        "UNKNOWN";
+
+      return;
+    }
+
+
+    // --------------------------------------------------------
+    // Reset locks on gesture transition
+    // --------------------------------------------------------
+
+    if (
+      previousGestureRef.current !==
+      gesture
+    ) {
+      Object.keys(
+        gestureLockRef.current
+      ).forEach(
+        (key) => {
+          if (
+            key !== gesture
+          ) {
+            gestureLockRef.current[key] =
+              false;
+          }
+        }
+      );
+
+      previousGestureRef.current =
+        gesture;
+    }
+
+
+    // --------------------------------------------------------
+    // POINT is targeting only
+    // --------------------------------------------------------
+
+    if (
+      gesture === "POINT"
+    ) {
+      return;
+    }
+
+
+    // --------------------------------------------------------
+    // Gesture processor
+    // --------------------------------------------------------
+
+    const processGesture =
+      (
+        key,
+        handler,
+        cooldown
+      ) => {
+        if (
+          gestureLockRef.current[key]
+        ) {
+          return;
+        }
+
+        if (
+          cooldownRef.current[key]
+        ) {
+          return;
+        }
+
+        gestureLockRef.current[key] =
+          true;
+
+        cooldownRef.current[key] =
+          true;
+
+        handler();
+
+        if (
+          timerRef.current[key]
+        ) {
+          clearTimeout(
+            timerRef.current[key]
+          );
+        }
+
+        timerRef.current[key] =
+          setTimeout(
+            () => {
+              cooldownRef.current[key] =
+                false;
+            },
+            cooldown
+          );
+      };
+
+
+    if (
+      gesture === "PINCH"
+    ) {
+      processGesture(
+        "PINCH",
+        processPinch,
+        450
+      );
+
+      return;
+    }
+
+
+    if (
+      gesture === "FIST"
+    ) {
+      processGesture(
+        "FIST",
+        processFist,
+        700
+      );
+
+      return;
+    }
+
+
+    if (
+      gesture === "OPEN_PALM"
+    ) {
+      processGesture(
+        "OPEN_PALM",
+        processOpenPalm,
+        700
+      );
+
+      return;
+    }
+
+
+    if (
+      gesture === "TWO_FINGER"
+    ) {
+      processGesture(
+        "TWO_FINGER",
+        processTwoFinger,
+        700
+      );
+    }
+  }, [
+    cursorPosition?.gesture,
+    cursorPosition?.visible,
+    processPinch,
+    processFist,
+    processOpenPalm,
+    processTwoFinger,
+    recordGestureEvent,
+  ]);
+
+
+  // ==========================================================
+  // WIDGET REF
+  // ==========================================================
+
+  const setWidgetRef =
+    useCallback(
+      (
+        widgetId,
+        element
+      ) => {
+        if (element) {
+          widgetRefs.current[
+            widgetId
+          ] = element;
+        } else {
+          delete widgetRefs.current[
+            widgetId
+          ];
+        }
+      },
+      []
+    );
+
+
+  // ==========================================================
+  // MANUAL WIDGET SELECTION
+  // ==========================================================
+
+  const handleWidgetSelect =
+    useCallback(
+      (widget) => {
+        selectWidget(
+          widget.id
+        );
+
+        setInteractionMessage(
+          `${widget.title} selected`
+        );
+
+        recordWidgetEvent(
+          widget.id,
+          "manual_select"
+        );
+      },
+      [selectWidget]
+    );
+
+
+  // ==========================================================
+  // CLOSE ACTION
+  // ==========================================================
+
+  const closeActiveAction =
+    useCallback(
+      () => {
+        setActiveAction(
+          null
+        );
+
+        clearSelection();
+
+        setInteractionMessage(
+          "Widget closed"
+        );
+      },
+      [clearSelection]
+    );
+
+
+  // ==========================================================
+  // CLEANUP
+  // ==========================================================
+
+  useEffect(() => {
+    return () => {
+      Object.values(
+        timerRef.current
+      ).forEach(
+        (timer) => {
+          if (timer) {
+            clearTimeout(
+              timer
+            );
+          }
+        }
+      );
+
+      if (
+        refreshTimerRef.current
+      ) {
+        clearTimeout(
+          refreshTimerRef.current
+        );
+      }
+
+      widgetRefs.current =
+        {};
+
+      hoveredWidgetRef.current =
+        null;
+
+      selectedWidgetRef.current =
+        null;
+    };
+  }, []);
+
+
+  // ==========================================================
+  // RESPONSIVE RENDER
+  // ==========================================================
+
+  return (
+    <section
+      className="
+        relative
+        min-h-screen
+        w-full
+        overflow-x-hidden
+        overflow-y-visible
+        bg-[#020617]
+        px-3
+        pb-12
+        pt-3
+        text-white
+        sm:px-4
+        sm:pb-14
+        sm:pt-4
+        md:px-5
+        lg:px-6
+        xl:px-8
+      "
+    >
+
+      {/* =====================================================
+          ATMOSPHERIC BACKGROUND
+      ====================================================== */}
+
+      <div
+        className="
+          pointer-events-none
+          fixed
+          inset-0
+          z-0
+          overflow-hidden
+        "
+      >
+        <div
+          className="
+            absolute
+            -left-32
+            top-10
+            h-72
+            w-72
+            rounded-full
+            bg-cyan-500/[0.06]
+            blur-[100px]
+            sm:-left-40
+            sm:top-20
+            sm:h-[500px]
+            sm:w-[500px]
+            sm:blur-[140px]
+          "
+        />
+
+        <div
+          className="
+            absolute
+            -right-32
+            top-[25%]
+            h-80
+            w-80
+            rounded-full
+            bg-purple-500/[0.05]
+            blur-[110px]
+            sm:-right-40
+            sm:h-[550px]
+            sm:w-[550px]
+            sm:blur-[150px]
+          "
+        />
+
+        <div
+          className="
+            absolute
+            bottom-[-150px]
+            left-1/2
+            h-80
+            w-80
+            -translate-x-1/2
+            rounded-full
+            bg-blue-500/[0.035]
+            blur-[100px]
+            sm:bottom-[-200px]
+            sm:h-[500px]
+            sm:w-[500px]
+            sm:blur-[140px]
+          "
+        />
+
+        <div
+          className="
+            absolute
+            inset-0
+            opacity-[0.018]
+            sm:opacity-[0.025]
+          "
+          style={{
+            backgroundImage: `
+              linear-gradient(
+                rgba(34,211,238,0.8) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                90deg,
+                rgba(34,211,238,0.8) 1px,
+                transparent 1px
+              )
+            `,
+            backgroundSize:
+              "45px 45px",
+          }}
+        />
+      </div>
+
+
+      {/* =====================================================
+          MAIN CONTAINER
+      ====================================================== */}
+
+      <div
+        className="
+          relative
+          z-10
+          mx-auto
+          w-full
+          max-w-[1600px]
+        "
+      >
+
+        {/* ===================================================
+            COMMAND HEADER
+        ==================================================== */}
+
+        <header
+          className="
+            relative
+            mb-4
+            overflow-hidden
+            rounded-2xl
+            border
+            border-white/[0.07]
+            bg-slate-950/75
+            p-4
+            shadow-[0_20px_80px_rgba(0,0,0,0.25)]
+            backdrop-blur-2xl
+            sm:mb-5
+            sm:rounded-3xl
+            sm:p-5
+            lg:p-6
+          "
+        >
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              inset-x-0
+              top-0
+              h-px
+              bg-gradient-to-r
+              from-transparent
+              via-cyan-400/60
+              to-transparent
+            "
+          />
+
+
+          <div
+            className="
+              flex
+              flex-col
+              gap-5
+              xl:flex-row
+              xl:items-center
+              xl:justify-between
+            "
+          >
+
+            {/* BRAND */}
+
+            <div
+              className="
+                min-w-0
+                flex-1
+              "
+            >
+
+              <div
+                className="
+                  flex
+                  min-w-0
+                  items-center
+                  gap-2
+                "
+              >
+
+                <div
+                  className="
+                    flex
+                    h-8
+                    w-8
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    border
+                    border-cyan-400/20
+                    bg-cyan-400/5
+                  "
+                >
+                  <BrainCircuit
+                    size={16}
+                    className="text-cyan-300"
+                  />
+                </div>
+
+                <span
+                  className="
+                    truncate
+                    text-[8px]
+                    font-medium
+                    uppercase
+                    tracking-[0.2em]
+                    text-cyan-400
+                    sm:text-[9px]
+                    sm:tracking-[0.28em]
+                  "
+                >
+                  Autonomous Spatial Intelligence
+                </span>
+
+              </div>
+
+
+              <div
+                className="
+                  mt-3
+                  flex
+                  flex-wrap
+                  items-center
+                  gap-2
+                  sm:gap-3
+                "
+              >
+
+                <h1
+                  className="
+                    text-xl
+                    font-semibold
+                    tracking-tight
+                    text-white
+                    sm:text-2xl
+                    md:text-3xl
+                  "
+                >
+                  AURA
+
+                  <span
+                    className="
+                      ml-1.5
+                      bg-gradient-to-r
+                      from-cyan-300
+                      via-cyan-400
+                      to-purple-400
+                      bg-clip-text
+                      text-transparent
+                      sm:ml-2
+                    "
+                  >
+                    Command Center
+                  </span>
+                </h1>
+
+                <span
+                  className="
+                    rounded-md
+                    border
+                    border-cyan-400/10
+                    bg-cyan-400/5
+                    px-2
+                    py-1
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-cyan-300
+                    sm:text-[8px]
+                  "
+                >
+                  v2.0 Spatial Core
+                </span>
+
+              </div>
+
+
+              <p
+                className="
+                  mt-2
+                  max-w-2xl
+                  text-[10px]
+                  leading-relaxed
+                  text-slate-500
+                  sm:text-xs
+                "
+              >
+                Real-time computer vision,
+                gesture intelligence and
+                spatial interaction telemetry
+                unified into one command interface.
+              </p>
+
+            </div>
+
+
+            {/* HEADER TELEMETRY */}
+
+            <div
+              className="
+                grid
+                w-full
+                grid-cols-2
+                gap-2
+                sm:grid-cols-4
+                xl:w-auto
+              "
+            >
+
+              <StatusPill
+                status={backendStatus}
+                label="Backend"
+              />
+
+              <StatusPill
+                status={
+                  visionStatus?.opencv ||
+                  "WAITING"
+                }
+                label="Vision"
+              />
+
+              <StatusPill
+                status={
+                  pipelineStatus?.mediapipe ||
+                  "WAITING"
+                }
+                label="Hand AI"
+              />
+
+              <button
+                type="button"
+                onClick={refreshSystem}
+                className="
+                  flex
+                  min-h-[30px]
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-full
+                  border
+                  border-white/10
+                  bg-white/[0.03]
+                  px-3
+                  py-1
+                  text-[8px]
+                  uppercase
+                  tracking-wider
+                  text-slate-300
+                  transition
+                  duration-200
+                  hover:border-cyan-400/20
+                  hover:bg-cyan-400/5
+                  active:scale-[0.98]
+                  sm:text-[9px]
+                "
+              >
+
+                <RefreshCw
+                  size={11}
+                  className={
+                    refreshPulse
+                      ? "animate-spin text-cyan-300"
+                      : "text-slate-400"
+                  }
+                />
+
+                Refresh
+
+              </button>
+
+            </div>
+
+          </div>
+
+
+          {/* =================================================
+              QUICK STATUS STRIP
+          ================================================== */}
+
+          <div
+            className="
+              mt-4
+              grid
+              gap-2
+              border-t
+              border-white/5
+              pt-3
+              sm:mt-5
+              sm:grid-cols-2
+              sm:pt-4
+              lg:grid-cols-4
+            "
+          >
+
+            {/* SPATIAL MODE */}
+
+            <div
+              className="
+                flex
+                min-w-0
+                items-center
+                gap-3
+                rounded-xl
+                border
+                border-white/5
+                bg-black/20
+                px-3
+                py-2.5
+              "
+            >
+
+              <Radio
+                size={13}
+                className="shrink-0 text-cyan-400"
+              />
+
+              <div className="min-w-0">
+                <div
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  Spatial Mode
+                </div>
+
+                <div
+                  className="
+                    mt-0.5
+                    truncate
+                    text-[9px]
+                    font-medium
+                    text-cyan-300
+                    sm:text-[10px]
+                  "
+                >
+                  {cursorActive
+                    ? "TRACKING ACTIVE"
+                    : "STANDBY"}
+                </div>
+              </div>
+
+            </div>
+
+
+            {/* CURRENT GESTURE */}
+
+            <div
+              className="
+                flex
+                min-w-0
+                items-center
+                gap-3
+                rounded-xl
+                border
+                border-white/5
+                bg-black/20
+                px-3
+                py-2.5
+              "
+            >
+
+              <Hand
+                size={13}
+                className="shrink-0 text-purple-400"
+              />
+
+              <div className="min-w-0">
+                <div
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  Current Gesture
+                </div>
+
+                <div
+                  className="
+                    mt-0.5
+                    truncate
+                    text-[9px]
+                    font-medium
+                    text-purple-300
+                    sm:text-[10px]
+                  "
+                >
+                  {currentGesture}
+                </div>
+              </div>
+
+            </div>
+
+
+            {/* TARGET */}
+
+            <div
+              className="
+                flex
+                min-w-0
+                items-center
+                gap-3
+                rounded-xl
+                border
+                border-white/5
+                bg-black/20
+                px-3
+                py-2.5
+              "
+            >
+
+              <Target
+                size={13}
+                className="shrink-0 text-emerald-400"
+              />
+
+              <div className="min-w-0">
+                <div
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  Target State
+                </div>
+
+                <div
+                  className="
+                    mt-0.5
+                    truncate
+                    text-[9px]
+                    font-medium
+                    text-emerald-300
+                    sm:text-[10px]
+                  "
+                >
+                  {selectedWidget
+                    ? "LOCKED"
+                    : hoveredWidget
+                    ? "ACQUIRED"
+                    : "SEARCHING"}
+                </div>
+              </div>
+
+            </div>
+
+
+            {/* HEALTH */}
+
+            <div
+              className="
+                flex
+                min-w-0
+                items-center
+                gap-3
+                rounded-xl
+                border
+                border-white/5
+                bg-black/20
+                px-3
+                py-2.5
+              "
+            >
+
+              <ShieldCheck
+                size={13}
+                className="shrink-0 text-amber-400"
+              />
+
+              <div className="min-w-0">
+                <div
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  System Health
+                </div>
+
+                <div
+                  className="
+                    mt-0.5
+                    truncate
+                    text-[9px]
+                    font-medium
+                    text-amber-300
+                    sm:text-[10px]
+                  "
+                >
+                  {healthScore}% OPTIMAL
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </header>
+
+
+        {/* ===================================================
+            SPATIAL COMMAND DECK
+        ==================================================== */}
+
+        <section
+          className="
+            relative
+            mb-4
+            overflow-hidden
+            rounded-2xl
+            border
+            border-cyan-400/10
+            bg-slate-950/65
+            shadow-[0_30px_100px_rgba(0,0,0,0.3)]
+            backdrop-blur-xl
+            sm:mb-5
+            sm:rounded-3xl
+          "
+        >
+
+          <div
+            className="
+              flex
+              min-w-0
+              items-center
+              justify-between
+              gap-3
+              border-b
+              border-white/5
+              px-4
+              py-3
+              sm:px-5
+            "
+          >
+
+            <div
+              className="
+                flex
+                min-w-0
+                items-center
+                gap-2
+              "
+            >
+
+              <ScanLine
+                size={14}
+                className="shrink-0 text-cyan-400"
+              />
+
+              <span
+                className="
+                  truncate
+                  text-[8px]
+                  font-medium
+                  uppercase
+                  tracking-[0.18em]
+                  text-cyan-300
+                  sm:text-[9px]
+                  sm:tracking-[0.22em]
+                "
+              >
+                Spatial Command Deck
+              </span>
+
+            </div>
+
+
+            <div
+              className="
+                flex
+                shrink-0
+                items-center
+                gap-2
+              "
+            >
+
+              <span
+                className="
+                  h-1.5
+                  w-1.5
+                  animate-pulse
+                  rounded-full
+                  bg-emerald-400
+                "
+              />
+
+              <span
+                className="
+                  text-[7px]
+                  uppercase
+                  tracking-wider
+                  text-emerald-400
+                  sm:text-[8px]
+                "
+              >
+                Live
+              </span>
+
+            </div>
+
+          </div>
+
+
+          {/* RESPONSIVE AR CORE */}
+
+          <div
+            className="
+              relative
+              h-[min(68vh,560px)]
+              min-h-[360px]
+              w-full
+              overflow-hidden
+              sm:h-[min(68vh,520px)]
+              sm:min-h-[400px]
+              lg:h-[min(70vh,560px)]
+              xl:h-[560px]
+            "
+          >
+
+            <AdvancedDashboardCore
+              cursorPosition={
+                cursorPosition
+              }
+
+              gestureStats={
+                gestureStats
+              }
+
+              interactionCount={
+                interactionCount
+              }
+
+              lastInteraction={
+                lastInteraction
+              }
+
+              backendStatus={
+                backendStatus
+              }
+
+              visionStatus={
+                visionStatus
+              }
+
+              pipelineStatus={
+                pipelineStatus
+              }
+
+              selectedWidget={
+                selectedWidget
+              }
+
+              hoveredWidget={
+                hoveredWidget
+              }
+
+              activeAction={
+                activeAction
+              }
+            />
+
+          </div>
+
+        </section>
+
+
+        {/* ===================================================
+            CORE METRICS
+        ==================================================== */}
+
+        <section
+          className="
+            mb-4
+            grid
+            grid-cols-1
+            gap-3
+            sm:mb-5
+            sm:grid-cols-2
+            xl:grid-cols-4
+          "
+        >
+
+          {widgets.map(
+            (widget) => (
+              <ARWidget
+                key={
+                  widget.id
+                }
+
+                ref={
+                  (element) =>
+                    setWidgetRef(
+                      widget.id,
+                      element
+                    )
+                }
+
+                title={
+                  widget.title
+                }
+
+                value={
+                  widget.value
+                }
+
+                description={
+                  widget.description
+                }
+
+                icon={
+                  widget.icon
+                }
+
+                selected={
+                  selectedWidget ===
+                  widget.id
+                }
+
+                hovered={
+                  hoveredWidget ===
+                  widget.id
+                }
+
+                onSelect={() =>
+                  handleWidgetSelect(
+                    widget
+                  )
+                }
+              />
+            )
+          )}
+
+        </section>
+
+
+        {/* ===================================================
+            INTELLIGENCE STRIP
+        ==================================================== */}
+
+        <section
+          className="
+            mb-4
+            grid
+            grid-cols-2
+            gap-3
+            sm:mb-5
+            lg:grid-cols-4
+          "
+        >
+
+          <MiniMetric
+            label="Gesture Events"
+            value={
+              totalGestures
+            }
+            icon={Hand}
+            accent="cyan"
+          />
+
+          <MiniMetric
+            label="Confidence"
+            value={`${confidence}%`}
+            icon={Gauge}
+            accent="purple"
+          />
+
+          <MiniMetric
+            label="Processing"
+            value={
+              dashboardLoading
+                ? "..."
+                : `${processingRate}%`
+            }
+            icon={Cpu}
+            accent="emerald"
+          />
+
+          <MiniMetric
+            label="Active Users"
+            value={
+              activeUsers
+            }
+            icon={Activity}
+            accent="amber"
+          />
+
+        </section>
+
+
+        {/* ===================================================
+            MAIN ANALYTICS
+        ==================================================== */}
+
+        <section
+          className="
+            grid
+            min-w-0
+            gap-4
+            xl:grid-cols-3
+            xl:gap-5
+          "
+        >
+
+          {/* PERFORMANCE */}
+
+          <div
+            className="
+              min-w-0
+              overflow-hidden
+              rounded-2xl
+              border
+              border-white/5
+              bg-slate-950/60
+              p-4
+              sm:rounded-3xl
+              sm:p-5
+              xl:col-span-2
+            "
+          >
+
+            <SectionHeader
+              icon={Activity}
+              eyebrow="Telemetry"
+              title="Performance Monitor"
+              right={
+                <div
+                  className="
+                    rounded-full
+                    border
+                    border-cyan-400/10
+                    bg-cyan-400/5
+                    px-2.5
+                    py-1
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-cyan-300
+                    sm:text-[8px]
+                  "
+                >
+                  LIVE
+                </div>
+              }
+            />
+
+            <div
+              className="
+                min-h-[240px]
+                w-full
+                overflow-hidden
+                sm:min-h-[280px]
+              "
+            >
+              <PerformanceChart />
+            </div>
+
+          </div>
+
+
+          {/* SYSTEM STATUS */}
+
+          <div
+            className="
+              min-w-0
+              overflow-hidden
+              rounded-2xl
+              border
+              border-white/5
+              bg-slate-950/60
+              p-4
+              sm:rounded-3xl
+              sm:p-5
+            "
+          >
+
+            <SectionHeader
+              icon={ShieldCheck}
+              eyebrow="Diagnostics"
+              title="System Status"
+            />
+
+            <SystemStatus />
+
+          </div>
+
+        </section>
+
+
+        {/* ===================================================
+            GESTURE + AI
+        ==================================================== */}
+
+        <section
+          className="
+            mt-4
+            grid
+            min-w-0
+            gap-4
+            sm:mt-5
+            lg:grid-cols-3
+            lg:gap-5
+          "
+        >
+
+          {/* =================================================
+              GESTURE INTERFACE
+          ================================================== */}
+
+          <div
+            className="
+              min-w-0
+              rounded-2xl
+              border
+              border-purple-400/10
+              bg-slate-950/60
+              p-4
+              sm:rounded-3xl
+              sm:p-5
+              lg:col-span-2
+            "
+          >
+
+            <SectionHeader
+              icon={Hand}
+              eyebrow="Interaction Engine"
+              title="Gesture Interface"
+              right={
+                <span
+                  className="
+                    text-[8px]
+                    text-slate-500
+                    sm:text-[9px]
+                  "
+                >
+                  {interactionCount} EVENTS
+                </span>
+              }
+            />
+
+
+            <div
+              className="
+                grid
+                min-w-0
+                gap-3
+                sm:gap-4
+                lg:grid-cols-[1.1fr_0.9fr]
+              "
+            >
+
+              {/* CURRENT INPUT */}
+
+              <div className="min-w-0">
+
+                <div
+                  className="
+                    rounded-2xl
+                    border
+                    border-white/5
+                    bg-black/20
+                    p-3
+                    sm:p-4
+                  "
+                >
+
+                  <div
+                    className="
+                      flex
+                      items-center
+                      justify-between
+                      gap-3
+                    "
+                  >
+
+                    <div className="min-w-0">
+
+                      <div
+                        className="
+                          text-[7px]
+                          uppercase
+                          tracking-[0.2em]
+                          text-slate-600
+                          sm:text-[8px]
+                        "
+                      >
+                        Current Input
+                      </div>
+
+                      <div
+                        className="
+                          mt-1.5
+                          truncate
+                          text-xl
+                          font-semibold
+                          text-white
+                          sm:mt-2
+                          sm:text-2xl
+                        "
+                      >
+                        {currentGesture}
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        flex
+                        h-11
+                        w-11
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-2xl
+                        border
+                        border-cyan-400/10
+                        bg-cyan-400/5
+                        text-lg
+                        sm:h-12
+                        sm:w-12
+                        sm:text-xl
+                      "
+                    >
+                      {currentGesture ===
+                      "POINT"
+                        ? "☝"
+                        : currentGesture ===
+                          "PINCH"
+                        ? "🤏"
+                        : currentGesture ===
+                          "FIST"
+                        ? "✊"
+                        : currentGesture ===
+                          "OPEN_PALM"
+                        ? "✋"
+                        : currentGesture ===
+                          "TWO_FINGER"
+                        ? "✌"
+                        : "◎"}
+                    </div>
+
+                  </div>
+
+
+                  <div className="mt-3 sm:mt-4">
+
+                    <GestureStatus
+                      gesture={
+                        cursorPosition?.gesture
+                      }
+
+                      confidence={
+                        cursorPosition?.confidence
+                      }
+                    />
+
+                  </div>
+
+                </div>
+
+
+                {/* INTERACTION STATE */}
+
+                <div
+                  className="
+                    mt-3
+                    rounded-2xl
+                    border
+                    border-white/5
+                    bg-black/20
+                    p-3
+                    sm:p-4
+                  "
+                >
+
+                  <div
+                    className="
+                      text-[7px]
+                      uppercase
+                      tracking-[0.2em]
+                      text-slate-600
+                      sm:text-[8px]
+                    "
+                  >
+                    Interaction State
+                  </div>
+
+                  <div
+                    className="
+                      mt-2
+                      break-words
+                      text-[11px]
+                      leading-relaxed
+                      text-purple-300
+                      sm:text-xs
+                    "
+                  >
+                    {interactionMessage}
+                  </div>
+
+                  <div
+                    className="
+                      mt-2
+                      break-words
+                      text-[9px]
+                      text-slate-600
+                      sm:text-[10px]
+                    "
+                  >
+                    Last event:
+
+                    <span
+                      className="
+                        ml-1
+                        text-slate-400
+                      "
+                    >
+                      {lastInteraction}
+                    </span>
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              {/* =================================================
+                  GESTURE DISTRIBUTION
+              ================================================== */}
+
+              <div
+                className="
+                  min-w-0
+                  rounded-2xl
+                  border
+                  border-white/5
+                  bg-black/20
+                  p-3
+                  sm:p-4
+                "
+              >
+
+                <div
+                  className="
+                    mb-4
+                    text-[7px]
+                    uppercase
+                    tracking-[0.2em]
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  Gesture Distribution
+                </div>
+
+
+                <div
+                  className="
+                    space-y-3
+                    sm:space-y-4
+                  "
+                >
+
+                  {gestureDistribution.map(
+                    (item) => {
+                      const percentage =
+                        totalGestures > 0
+                          ? Math.round(
+                              (
+                                item.value /
+                                totalGestures
+                              ) *
+                                100
+                            )
+                          : 0;
+
+                      return (
+                        <div
+                          key={
+                            item.key
+                          }
+                        >
+
+                          <div
+                            className="
+                              mb-1.5
+                              flex
+                              items-center
+                              justify-between
+                              gap-2
+                            "
+                          >
+
+                            <div
+                              className="
+                                flex
+                                min-w-0
+                                items-center
+                                gap-2
+                              "
+                            >
+
+                              <span
+                                className="shrink-0"
+                              >
+                                {item.icon}
+                              </span>
+
+                              <span
+                                className={`
+                                  truncate
+                                  text-[9px]
+                                  sm:text-[10px]
+                                  ${item.className}
+                                `}
+                              >
+                                {item.label}
+                              </span>
+
+                            </div>
+
+                            <span
+                              className="
+                                shrink-0
+                                text-[8px]
+                                text-slate-500
+                                sm:text-[9px]
+                              "
+                            >
+                              {item.value}
+                            </span>
+
+                          </div>
+
+
+                          <div
+                            className="
+                              h-1
+                              overflow-hidden
+                              rounded-full
+                              bg-white/5
+                            "
+                          >
+
+                            <div
+                              className={`
+                                h-full
+                                rounded-full
+                                transition-all
+                                duration-500
+                                ${item.bar}
+                              `}
+                              style={{
+                                width:
+                                  `${percentage}%`,
+                              }}
+                            />
+
+                          </div>
+
+                        </div>
+                      );
+                    }
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          {/* =================================================
+              AI INSIGHT
+          ================================================== */}
+
+          <div
+            className="
+              relative
+              min-w-0
+              overflow-hidden
+              rounded-2xl
+              border
+              border-cyan-400/10
+              bg-gradient-to-br
+              from-cyan-400/[0.05]
+              via-slate-950/70
+              to-purple-500/[0.05]
+              p-4
+              sm:rounded-3xl
+              sm:p-5
+            "
+          >
+
+            <div
+              className="
+                pointer-events-none
+                absolute
+                -right-16
+                -top-16
+                h-40
+                w-40
+                rounded-full
+                bg-purple-500/10
+                blur-3xl
+              "
+            />
+
+
+            <SectionHeader
+              icon={Sparkles}
+              eyebrow="Intelligence Layer"
+              title="AI Insight"
+              right={
+                <span
+                  className="
+                    rounded-full
+                    border
+                    border-purple-400/15
+                    bg-purple-400/5
+                    px-2
+                    py-1
+                    text-[7px]
+                    text-purple-300
+                    sm:text-[8px]
+                  "
+                >
+                  LIVE
+                </span>
+              }
+            />
+
+
+            <div
+              className="
+                relative
+                min-w-0
+                rounded-2xl
+                border
+                border-white/5
+                bg-black/20
+                p-3
+                sm:p-4
+              "
+            >
+
+              <div
+                className="
+                  text-[7px]
+                  uppercase
+                  tracking-[0.2em]
+                  text-slate-600
+                  sm:text-[8px]
+                "
+              >
+                Detected Intent
+              </div>
+
+              <div
+                className="
+                  mt-1.5
+                  truncate
+                  text-lg
+                  font-semibold
+                  text-white
+                  sm:mt-2
+                  sm:text-xl
+                "
+              >
+                {currentGesture}
+              </div>
+
+              <p
+                className="
+                  mt-2
+                  text-[9px]
+                  leading-relaxed
+                  text-slate-500
+                  sm:text-[10px]
+                "
+              >
+                {cursorActive
+                  ? "Spatial target tracking is active. The interaction engine is monitoring the current gesture and target."
+                  : "Waiting for a valid spatial input from the computer vision pipeline."}
+              </p>
+
+            </div>
+
+
+            <div
+              className="
+                mt-3
+                grid
+                grid-cols-2
+                gap-2
+              "
+            >
+
+              {/* CONFIDENCE */}
+
+              <div
+                className="
+                  min-w-0
+                  rounded-xl
+                  border
+                  border-white/5
+                  bg-black/20
+                  p-3
+                "
+              >
+
+                <div
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  Confidence
+                </div>
+
+                <div
+                  className="
+                    mt-1
+                    truncate
+                    text-base
+                    font-semibold
+                    text-cyan-300
+                    sm:text-lg
+                  "
+                >
+                  {confidence}%
+                </div>
+
+              </div>
+
+
+              {/* TARGET */}
+
+              <div
+                className="
+                  min-w-0
+                  rounded-xl
+                  border
+                  border-white/5
+                  bg-black/20
+                  p-3
+                "
+              >
+
+                <div
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-slate-600
+                    sm:text-[8px]
+                  "
+                >
+                  Target
+                </div>
+
+                <div
+                  className="
+                    mt-1
+                    truncate
+                    text-base
+                    font-semibold
+                    text-emerald-300
+                    sm:text-lg
+                  "
+                >
+                  {selectedWidget
+                    ? "LOCKED"
+                    : hoveredWidget
+                    ? "READY"
+                    : "SEARCH"}
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* ACTIVE ACTION */}
+
+            <div
+              className="
+                mt-3
+                rounded-xl
+                border
+                border-cyan-400/10
+                bg-cyan-400/[0.03]
+                p-3
+              "
+            >
+
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-2
+                "
+              >
+
+                <Zap
+                  size={12}
+                  className="shrink-0 text-cyan-400"
+                />
+
+                <span
+                  className="
+                    text-[7px]
+                    uppercase
+                    tracking-wider
+                    text-cyan-300
+                    sm:text-[8px]
+                  "
+                >
+                  Active Action
+                </span>
+
+              </div>
+
+              <div
+                className="
+                  mt-2
+                  break-words
+                  text-[10px]
+                  font-medium
+                  leading-relaxed
+                  text-white
+                  sm:text-xs
+                "
+              >
+                {activeAction?.message ||
+                  activeAction?.title ||
+                  "No active action"}
+              </div>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ===================================================
+            PIPELINE OVERVIEW
+        ==================================================== */}
+
+        <section
+          className="
+            mt-4
+            overflow-hidden
+            rounded-2xl
+            border
+            border-white/5
+            bg-slate-950/60
+            p-4
+            sm:mt-5
+            sm:rounded-3xl
+            sm:p-5
+          "
+        >
+
+          <SectionHeader
+            icon={Layers3}
+            eyebrow="Computer Vision"
+            title="Pipeline Overview"
+            right={
+              <StatusPill
+                status={
+                  backendStatus
+                }
+              />
+            }
+          />
+
+
+          <div
+            className="
+              grid
+              gap-3
+              sm:grid-cols-2
+              lg:grid-cols-4
+            "
+          >
+
+            <PipelineCard
+              label="OpenCV"
+              value={
+                visionStatus?.opencv ||
+                "WAITING"
+              }
+              icon={CheckCircle2}
+              accent="emerald"
+            />
+
+            <PipelineCard
+              label="Hand Landmarker"
+              value={
+                pipelineStatus?.mediapipe ||
+                "WAITING"
+              }
+              icon={Hand}
+              accent="cyan"
+            />
+
+            <PipelineCard
+              label="Frame Engine"
+              value={
+                pipelineStatus?.frame_processing ||
+                "WAITING"
+              }
+              icon={Cpu}
+              accent="purple"
+            />
+
+            <PipelineCard
+              label="Object Detection"
+              value={
+                pipelineStatus?.object_detection ===
+                    "ready" ||
+                pipelineStatus?.object_detection ===
+                    "initialized"
+                  ? "READY"
+                  : pipelineStatus?.object_detection ===
+                    "not_initialized"
+                  ? "STANDBY"
+                  : pipelineStatus?.object_detection ||
+                    "WAITING"
+              }
+              icon={Target}
+              accent="amber"
+            />
+
+          </div>
+
+
+          {/* DASHBOARD ERROR */}
+
+          {(backendError ||
+            dashboardError) && (
+            <div
+              className="
+                mt-4
+                flex
+                min-w-0
+                items-start
+                gap-3
+                rounded-xl
+                border
+                border-red-400/10
+                bg-red-400/[0.03]
+                px-3
+                py-3
+                text-[10px]
+                leading-relaxed
+                text-red-300
+                sm:px-4
+                sm:text-xs
+              "
+            >
+
+              <AlertTriangle
+                size={14}
+                className="
+                  mt-0.5
+                  shrink-0
+                "
+              />
+
+              <span className="min-w-0 break-words">
+                {backendError
+                  ? `Backend error: ${backendError}`
+                  : `Dashboard error: ${dashboardError}`}
+              </span>
+
+            </div>
+          )}
+
+        </section>
+
+
+        {/* ===================================================
+            GESTURE COMMAND MAP
+        ==================================================== */}
+
+        <section
+          className="
+            mt-4
+            rounded-2xl
+            border
+            border-white/5
+            bg-slate-950/60
+            p-4
+            sm:mt-5
+            sm:rounded-3xl
+            sm:p-5
+          "
+        >
+
+          <SectionHeader
+            icon={Radio}
+            eyebrow="Spatial Controls"
+            title="Gesture Command Map"
+            right={
+              <span
+                className="
+                  hidden
+                  text-[8px]
+                  uppercase
+                  tracking-wider
+                  text-slate-600
+                  sm:block
+                "
+              >
+                Hands-Free Control
+              </span>
+            }
+          />
+
+
+          <div
+            className="
+              grid
+              gap-2
+              grid-cols-1
+              sm:grid-cols-2
+              lg:grid-cols-5
+            "
+          >
+
+            {[
+              [
+                "☝",
+                "POINT",
+                "Target",
+                "cyan",
+              ],
+              [
+                "🤏",
+                "PINCH",
+                "Select",
+                "purple",
+              ],
+              [
+                "✌",
+                "TWO FINGER",
+                "Action",
+                "amber",
+              ],
+              [
+                "✊",
+                "FIST",
+                "Close",
+                "rose",
+              ],
+              [
+                "✋",
+                "OPEN PALM",
+                "Reset",
+                "emerald",
+              ],
+            ].map(
+              ([
+                icon,
+                gesture,
+                action,
+                color,
+              ]) => (
+                <div
+                  key={
+                    gesture
+                  }
+                  className="
+                    flex
+                    min-w-0
+                    items-center
+                    justify-between
+                    gap-3
+                    rounded-2xl
+                    border
+                    border-white/5
+                    bg-black/20
+                    px-3
+                    py-3
+                    transition
+                    duration-200
+                    hover:border-white/10
+                    sm:px-4
+                  "
+                >
+
+                  <div
+                    className="
+                      flex
+                      min-w-0
+                      items-center
+                      gap-3
+                    "
+                  >
+
+                    <span
+                      className="
+                        shrink-0
+                        text-lg
+                      "
+                    >
+                      {icon}
+                    </span>
+
+                    <div className="min-w-0">
+
+                      <div
+                        className={`
+                          truncate
+                          text-[8px]
+                          font-medium
+                          uppercase
+                          tracking-wider
+                          sm:text-[9px]
+                          ${
+                            color ===
+                            "cyan"
+                              ? "text-cyan-300"
+                              : color ===
+                                "purple"
+                              ? "text-purple-300"
+                              : color ===
+                                "amber"
+                              ? "text-amber-300"
+                              : color ===
+                                "rose"
+                              ? "text-rose-300"
+                              : "text-emerald-300"
+                          }
+                        `}
+                      >
+                        {gesture}
+                      </div>
+
+                      <div
+                        className="
+                          mt-0.5
+                          truncate
+                          text-[8px]
+                          text-slate-600
+                          sm:text-[9px]
+                        "
+                      >
+                        {action}
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <ChevronRight
+                    size={12}
+                    className="
+                      shrink-0
+                      text-slate-700
+                    "
+                  />
+
+                </div>
+              )
+            )}
+
+          </div>
+
+        </section>
+
+
+        {/* ===================================================
+            ACTION PANEL
+        ==================================================== */}
+
+        <WidgetActionPanel
+          action={
+            activeAction
+          }
+
+          onClose={
+            closeActiveAction
+          }
+        />
+
+
+        {/* ===================================================
+            ACTION DETAIL
+        ==================================================== */}
+
+        {activeAction && (
+          <ARWidgetDetail
+            action={
+              activeAction
+            }
+
+            onClose={
+              closeActiveAction
+            }
+          />
+        )}
+
+      </div>
+
+    </section>
+  );
+}
+
+
+export default ARDashboard;

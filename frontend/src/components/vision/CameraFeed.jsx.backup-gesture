@@ -32,7 +32,6 @@ import {
 
 function CameraFeed({
   onCursorUpdate,
-  backgroundOnly = false,
 }) {
 
   // =========================================================
@@ -595,16 +594,8 @@ function CameraFeed({
         //
         // ===================================================
 
-        const recognizedGestures = [
-          "POINT",
-          "PINCH",
-          "TWO_FINGER",
-          "FIST",
-          "OPEN_PALM",
-        ];
-
         const cursorVisible =
-          recognizedGestures.includes(detectedGesture);
+          detectedGesture === "POINT";
 
 
         updateCursor({
@@ -1375,15 +1366,14 @@ function CameraFeed({
   return (
 
     <div
-      className={`
+      className="
         relative
         min-h-[500px]
         w-full
         overflow-hidden
         rounded-2xl
         bg-black
-        ${backgroundOnly ? "pointer-events-none opacity-0" : ""}
-      `}
+      "
     >
 
       {/* =====================================================
@@ -1395,16 +1385,14 @@ function CameraFeed({
         autoPlay
         playsInline
         muted
-        className={`
-          pointer-events-none
+        className="
           absolute
           inset-0
           h-full
           w-full
           object-cover
           scale-x-[-1]
-          ${backgroundOnly ? "opacity-0" : ""}
-        `}
+        "
       />
 
 
@@ -1414,15 +1402,13 @@ function CameraFeed({
 
       <canvas
         ref={canvasRef}
-        className={`
-          pointer-events-none
+        className="
           absolute
           inset-0
           h-full
           w-full
           scale-x-[-1]
-          ${backgroundOnly ? "opacity-0" : ""}
-        `}
+        "
       />
 
 

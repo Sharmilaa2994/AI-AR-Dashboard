@@ -1,16 +1,84 @@
-# React + Vite
+# AI-Powered AR Dashboard with Computer Vision and Gesture-Based Interaction
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+An interactive Augmented Reality (AR) dashboard that uses computer vision, real-time hand tracking, gesture recognition, virtual cursor interaction, and object detection to create a touchless user interface.
 
-Currently, two official plugins are available:
+The system uses a standard webcam as the input device and translates hand movements and gestures into dashboard actions. The architecture is designed to support future integration with advanced AR displays, haptic interfaces, and spatial-computing hardware.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+##  Project Overview
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Traditional dashboards rely on physical input devices such as a mouse, keyboard, or touchscreen.
 
-## Expanding the Oxlint configuration
+This project explores a touchless alternative by combining:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- Computer Vision
+- Hand Landmark Detection
+- Gesture Recognition
+- Virtual Cursor Control
+- Object Detection
+- Real-Time Interaction Processing
+- AR-style HUD Visualization
+- Performance Monitoring
+
+The webcam captures the user's hand movements, the computer vision pipeline detects hand landmarks, and the gesture engine converts those movements into meaningful interaction commands.
+
+---
+
+## Objectives
+
+The main objectives of this project are:
+
+1. Develop a real-time computer vision based interaction system.
+2. Track human hand movements using MediaPipe.
+3. Recognize predefined hand gestures.
+4. Convert gestures into dashboard actions.
+5. Implement a virtual cursor controlled by the index finger.
+6. Integrate object detection into the AR workspace.
+7. Provide real-time visual feedback through an AR HUD.
+8. Monitor computer vision pipeline performance.
+9. Maintain a modular architecture for future hardware integration.
+
+---
+
+## Key Features
+
+###  Real-Time Hand Tracking
+
+The system detects and tracks hand landmarks using MediaPipe Hand Landmarker.
+
+The detected hand contains 21 landmarks representing important points of the hand.
+
+---
+
+###  Gesture Recognition
+
+The gesture engine recognizes hand configurations and converts them into interaction commands.
+
+| Gesture | Action |
+|---|---|
+| Point | Move Virtual Cursor |
+| Pinch | Select / Click |
+| Open Palm | Show / Reset Dashboard |
+| Two Finger | Navigate |
+| Fist | Cancel / Close |
+| Unknown | No Action |
+
+---
+
+###  Virtual Cursor
+
+The index finger can act as a virtual cursor.
+
+When the user performs the `POINT` gesture:
+
+```text
+Hand Movement
+      ↓
+Index Finger Tracking
+      ↓
+Screen Coordinate Mapping
+      ↓
+Virtual Cursor
+      ↓
+Dashboard Interaction

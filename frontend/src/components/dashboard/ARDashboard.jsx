@@ -1,355 +1,376 @@
+import {
+  Activity,
+  BarChart3,
+  BrainCircuit,
+  Database,
+  Grip,
+  Hand,
+  Layers,
+  MousePointer2,
+  Move,
+  Radio,
+  RefreshCw,
+  ScanLine,
+  Server,
+  ShieldCheck,
+  Target,
+  Table2,
+  Users,
+  X,
+  Zap,
+} from "lucide-react";
 
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 
-import PerformanceChart from "./PerformanceChart";
-import SystemStatus from "./SystemStatus";
-import ARWidget from "./ARWidget";
-import WidgetActionPanel from "./WidgetActionPanel";
-import ARWidgetDetail from "./ARWidgetDetail";
-import GestureStatus from "../gesture/GestureStatus";
 
+/* =========================================================
+   CONSTANTS
+========================================================= */
 
-import {
-  findTargetWidget,
-} from "../../services/interaction/widgetTargeting";
-
-import {
-  executeWidgetAction,
-} from "../../services/interaction/widgetActions";
-
-import {
-  useDashboardData,
-} from "../../hooks/useDashboardData";
-import {
-  getVisionStatus,
-  getVisionPipeline,
-} from "../../services/api/visionApi";
-
-import {
-  recordGesture,
-  recordCursorEvent,
-  recordWidgetEvent,
-} from "../../services/performance/performanceMonitor";
-
-
-
-function ARDashboard({
-  cursorPosition,
-}) {
-
-  // =========================================================
-  // STATE
-  // =========================================================
-
-  const [
-    selectedWidget,
-    setSelectedWidget,
-  ] = useState(null);
-
-
-  const [
-    hoveredWidget,
-    setHoveredWidget,
-  ] = useState(null);
-
-
-  const [
-    interactionMessage,
-    setInteractionMessage,
-  ] = useState(
-    "Point at a widget"
-  );
-
-
-  const [
-    activeAction,
-    setActiveAction,
-  ] = useState(null);
-
-  const [
-  interactionCount,
-  setInteractionCount,
-] = useState(0);
-  
-  const [
-  gestureStats,
-  setGestureStats,
-] = useState({
-  POINT: 0,
-  PINCH: 0,
-  TWO_FINGER: 0,
-  FIST: 0,
-  OPEN_PALM: 0,
-});
-
-  const [
-  lastInteraction,
-  setLastInteraction,
-] = useState("Waiting for gesture...");
-
-  const [
-  backendStatus,
-  setBackendStatus,
-] = useState("CONNECTING");
-
-const [
-  visionStatus,
-  setVisionStatus,
-] = useState(null);
-
-const [
-  pipelineStatus,
-  setPipelineStatus,
-] = useState(null);
-
-const [
-  backendError,
-  setBackendError,
-] = useState(null);
-
-  const {
-  data: dashboardData,
-  loading: dashboardLoading,
-  error: dashboardError,
-} = useDashboardData();
-
-
-  // =========================================================
-  // REFS
-  // =========================================================
-
-  const widgetRefs =
-    useRef({});
-
-
-  const hoveredWidgetRef =
-    useRef(null);
-
-
-  const selectedWidgetRef =
-    useRef(null);
-
-
-  const previousGestureRef =
-    useRef("UNKNOWN");
-
-
-  const gestureLockRef =
-    useRef({
-      PINCH: false,
-      FIST: false,
-      OPEN_PALM: false,
-      TWO_FINGER: false,
-    });
-
-
-  const cooldownRef =
-    useRef({
-      PINCH: false,
-      FIST: false,
-      OPEN_PALM: false,
-      TWO_FINGER: false,
-    });
-
-
-  const timerRef =
-    useRef({
-      PINCH: null,
-      FIST: null,
-      OPEN_PALM: null,
-      TWO_FINGER: null,
-    });
-
-  
-  // =========================================================
-// INTERACTION TRACKING
-// =========================================================
-
-const recordInteraction =
-  useCallback(
-    (gesture, message) => {
-
-      setInteractionCount(
-        (count) => count + 1
-      );
-
-      setGestureStats(
-        (stats) => ({
-          ...stats,
-          [gesture]:
-            (stats[gesture] || 0) + 1,
-        })
-      );
-
-      setLastInteraction(
-        `${gesture}: ${message}`
-      );
-
-      // ================================================
-      // PERFORMANCE MONITOR
-      // ================================================
-
-      recordGesture(
-        gesture
-      );
-
-      console.log(
-        "AR INTERACTION:",
-        {
-          gesture,
-          message,
-          timestamp:
-            new Date().toISOString(),
-        }
-      );
-
-    },
-    []
-  );
-
-  // =========================================================
-// BACKEND CONNECTION
-// =========================================================
-
-useEffect(() => {
-
-  let mounted = true;
-
-  const loadBackendStatus = async () => {
-
-    try {
-
-      const [
-        vision,
-        pipeline,
-      ] = await Promise.all([
-        getVisionStatus(),
-        getVisionPipeline(),
-      ]);
-
-      if (!mounted) {
-        return;
-      }
-
-      setVisionStatus(
-        vision
-      );
-
-      setPipelineStatus(
-        pipeline
-      );
-
-      setBackendStatus(
-        "ONLINE"
-      );
-
-      setBackendError(
-        null
-      );
-
-    } catch (error) {
-
-      console.error(
-        "BACKEND STATUS ERROR:",
-        error
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setBackendStatus(
-        "OFFLINE"
-      );
-
-      setBackendError(
-        error?.message ||
-        "Backend unavailable"
-      );
-    }
-  };
-
-  loadBackendStatus();
-
-  const interval =
-    setInterval(
-      loadBackendStatus,
-      5000
-    );
-
-  return () => {
-
-    mounted = false;
-
-    clearInterval(
-      interval
-    );
-
-  };
-
-}, []);
-
-
-  // =========================================================
-  // WIDGET DATA
-  // =========================================================
-
-  const widgets = [
+const DEFAULT_WIDGETS = [
   {
-    id: "users",
-    title: "Active Users",
-    value:
-      dashboardData?.active_users ??
-      "—",
-    description:
-      "+12.8% from previous period",
-    icon: "👥",
+    id: "system",
+    title: "System Status",
+    subtitle: "Real-time platform monitoring",
+    x: 20,
+    y: 20,
+    w: 340,
+    h: 190,
   },
 
   {
-    id: "load",
-    title: "System Load",
-    value:
-      dashboardData
-        ? `${dashboardData.system_load}%`
-        : "—",
-    description:
-      "Current system utilization",
-    icon: "⚡",
+    id: "users",
+    title: "Active Users",
+    subtitle: "Connected sessions",
+    x: 380,
+    y: 20,
+    w: 300,
+    h: 190,
   },
 
   {
     id: "processing",
-    title: "Processing Rate",
-    value:
-      dashboardData
-        ? `${dashboardData.processing_rate}%`
-        : "—",
-    description:
-      "Vision pipeline efficiency",
-    icon: "◈",
+    title: "Processing Engine",
+    subtitle: "Vision pipeline",
+    x: 700,
+    y: 20,
+    w: 340,
+    h: 190,
   },
 
   {
-  id: "interactions",
-  title: "Interactions",
-  value:
-    interactionCount.toLocaleString(),
-  description:
-    "Gesture events processed",
-  icon: "✋",
-},
-  ];
+    id: "analytics",
+    title: "Analytics",
+    subtitle: "Performance overview",
+    x: 1060,
+    y: 20,
+    w: 340,
+    h: 190,
+  },
+
+  {
+    id: "table",
+    title: "Live Data Table",
+    subtitle: "Movable dashboard content",
+    x: 20,
+    y: 240,
+    w: 660,
+    h: 300,
+  },
+
+  {
+    id: "activity",
+    title: "Activity Monitor",
+    subtitle: "Recent system events",
+    x: 700,
+    y: 240,
+    w: 340,
+    h: 300,
+  },
+
+  {
+    id: "gesture",
+    title: "Gesture Interface",
+    subtitle: "Spatial interaction engine",
+    x: 1060,
+    y: 240,
+    w: 340,
+    h: 300,
+  },
+
+  {
+    id: "pipeline",
+    title: "Pipeline Overview",
+    subtitle: "Computer vision services",
+    x: 20,
+    y: 570,
+    w: 660,
+    h: 250,
+  },
+
+  {
+    id: "insight",
+    title: "AI Insight",
+    subtitle: "Intelligence layer",
+    x: 700,
+    y: 570,
+    w: 700,
+    h: 250,
+  },
+];
 
 
-  // =========================================================
+const GESTURES = [
+  {
+    id: "POINT",
+    label: "Point",
+    icon: "☝️",
+    color: "text-cyan-300",
+    bar: "bg-cyan-400",
+  },
+
+  {
+    id: "PINCH",
+    label: "Pinch",
+    icon: "🤏",
+    color: "text-purple-300",
+    bar: "bg-purple-400",
+  },
+
+  {
+    id: "TWO_FINGER",
+    label: "Two Finger",
+    icon: "✌️",
+    color: "text-amber-300",
+    bar: "bg-amber-400",
+  },
+
+  {
+    id: "FIST",
+    label: "Fist",
+    icon: "✊",
+    color: "text-rose-300",
+    bar: "bg-rose-400",
+  },
+
+  {
+    id: "OPEN_PALM",
+    label: "Open Palm",
+    icon: "✋",
+    color: "text-emerald-300",
+    bar: "bg-emerald-400",
+  },
+];
+
+
+/* =========================================================
+   MAIN COMPONENT
+========================================================= */
+
+function ARDashboard({
+  cursorPosition = {
+    x: 0,
+    y: 0,
+    visible: false,
+    gesture: "UNKNOWN",
+    confidence: 0,
+  },
+
+  gestureStats = {
+    POINT: 0,
+    PINCH: 0,
+    TWO_FINGER: 0,
+    FIST: 0,
+    OPEN_PALM: 0,
+  },
+
+  onResetGestureStats,
+}) {
+
+  // =======================================================
+  // WIDGET STATE
+  // =======================================================
+
+  const [widgets, setWidgets] =
+    useState(DEFAULT_WIDGETS);
+
+
+  // =======================================================
+  // SELECTED WIDGET
+  // =======================================================
+
+  const [selectedWidget, setSelectedWidget] =
+    useState(null);
+
+
+  // =======================================================
+  // DRAG STATE
+  // =======================================================
+
+  const dragRef =
+    useRef({
+      active: false,
+      widgetId: null,
+      offsetX: 0,
+      offsetY: 0,
+    });
+
+
+  // =======================================================
+  // PINCH STATE
+  // =======================================================
+
+  const pinchRef =
+    useRef({
+      active: false,
+      widgetId: null,
+    });
+
+
+  // =======================================================
+  // SCROLL STATE
+  // =======================================================
+
+  const scrollRef =
+    useRef({
+      lastY: null,
+    });
+
+
+  // =======================================================
+  // DASHBOARD REF
+  // =======================================================
+
+  const dashboardRef =
+    useRef(null);
+
+
+  // =======================================================
+  // TOTAL GESTURES
+  // =======================================================
+
+  const totalGestures =
+    useMemo(
+      () =>
+        Object.values(
+          gestureStats || {}
+        ).reduce(
+          (sum, value) =>
+            sum + Number(value || 0),
+          0
+        ),
+      [gestureStats]
+    );
+
+
+  // =======================================================
+  // GESTURE PERCENTAGE
+  // =======================================================
+
+  const getGesturePercentage =
+    useCallback(
+      (gesture) => {
+
+        if (!totalGestures) {
+          return 0;
+        }
+
+        return Math.round(
+          (
+            Number(
+              gestureStats?.[gesture] || 0
+            ) /
+            totalGestures
+          ) * 100
+        );
+
+      },
+      [
+        gestureStats,
+        totalGestures,
+      ]
+    );
+
+
+  // =======================================================
+  // RESET LAYOUT
+  // =======================================================
+
+  const resetLayout =
+    useCallback(() => {
+
+      setWidgets(
+        DEFAULT_WIDGETS.map(
+          (widget) => ({
+            ...widget,
+          })
+        )
+      );
+
+      setSelectedWidget(null);
+
+    }, []);
+
+
+  // =======================================================
+  // FIND WIDGET UNDER SCREEN CURSOR
+  // =======================================================
+
+  const findWidgetAtCursor =
+    useCallback(
+      (
+        screenX,
+        screenY
+      ) => {
+
+        if (
+          !screenX &&
+          !screenY
+        ) {
+          return null;
+        }
+
+
+        const element =
+          document.elementFromPoint(
+            screenX,
+            screenY
+          );
+
+
+        if (!element) {
+          return null;
+        }
+
+
+        const widget =
+          element.closest(
+            "[data-ar-widget-id]"
+          );
+
+
+        if (!widget) {
+          return null;
+        }
+
+
+        return widget.dataset.arWidgetId ||
+          null;
+
+      },
+      []
+    );
+
+
+  // =======================================================
   // SELECT WIDGET
-  // =========================================================
+  // =======================================================
 
   const selectWidget =
     useCallback(
@@ -359,11 +380,6 @@ useEffect(() => {
           return;
         }
 
-
-        selectedWidgetRef.current =
-          widgetId;
-
-
         setSelectedWidget(
           widgetId
         );
@@ -373,48 +389,200 @@ useEffect(() => {
     );
 
 
-  // =========================================================
-  // CLEAR SELECTION
-  // =========================================================
+  // =======================================================
+  // START MOUSE DRAG
+  // =======================================================
 
-  const clearSelection =
+  const handlePointerDown =
     useCallback(
-      () => {
-
-        selectedWidgetRef.current =
-          null;
-
-
-        setSelectedWidget(
-          null
-        );
-
-      },
-      []
-    );
-
-
-  // =========================================================
-  // HOVER UPDATE
-  // =========================================================
-
-  const updateHoveredWidget =
-    useCallback(
-      (widgetId) => {
+      (
+        event,
+        widgetId
+      ) => {
 
         if (
-          hoveredWidgetRef.current ===
-          widgetId
+          event.button !== 0
         ) {
           return;
         }
 
 
-        hoveredWidgetRef.current =
-          widgetId;
+        const widget =
+          widgets.find(
+            (item) =>
+              item.id === widgetId
+          );
 
 
-        setHoveredWidget(
+        if (!widget) {
+          return;
+        }
+
+
+        const target =
+          event.currentTarget;
+
+
+        const rect =
+          target.getBoundingClientRect();
+
+
+        dragRef.current = {
+          active: true,
+          widgetId,
+          offsetX:
+            event.clientX -
+            rect.left,
+          offsetY:
+            event.clientY -
+            rect.top,
+        };
+
+
+        setSelectedWidget(
+          widgetId
+        );
+
+
+        target.setPointerCapture?.(
+          event.pointerId
+        );
+
+
+        event.preventDefault();
+        event.stopPropagation();
+
+      },
+      [widgets]
+    );
+
+
+  // =======================================================
+  // MOUSE DRAG MOVE
+  // =======================================================
+
+  const handlePointerMove =
+    useCallback(
+      (event) => {
+
+        if (
+          !dragRef.current.active
+        ) {
+          return;
+        }
+
+
+        const widgetId =
+          dragRef.current.widgetId;
+
+
+        const dashboard =
+          dashboardRef.current;
+
+
+        if (
+          !dashboard ||
+          !widgetId
+        ) {
+          return;
+        }
+
+
+        const rect =
+          dashboard.getBoundingClientRect();
+
+
+        let x =
+          event.clientX -
+          rect.left -
+          dragRef.current.offsetX;
+
+
+        let y =
+          event.clientY -
+          rect.top -
+          dragRef.current.offsetY;
+
+
+        x =
+          Math.max(
+            0,
+            Math.min(
+              dashboard.scrollWidth -
+                80,
+              x
+            )
+          );
+
+
+        y =
+          Math.max(
+            0,
+            Math.min(
+              dashboard.scrollHeight -
+                80,
+              y
+            )
+          );
+
+
+        setWidgets(
+          (previous) =>
+            previous.map(
+              (widget) =>
+                widget.id === widgetId
+                  ? {
+                      ...widget,
+                      x,
+                      y,
+                    }
+                  : widget
+            )
+        );
+
+      },
+      []
+    );
+
+
+  // =======================================================
+  // END MOUSE DRAG
+  // =======================================================
+
+  const handlePointerUp =
+    useCallback(() => {
+
+      dragRef.current.active =
+        false;
+
+      dragRef.current.widgetId =
+        null;
+
+    }, []);
+
+
+  // =======================================================
+  // PINCH DRAG START
+  // =======================================================
+
+  const startPinchDrag =
+    useCallback(
+      (
+        widgetId
+      ) => {
+
+        if (!widgetId) {
+          return;
+        }
+
+
+        pinchRef.current = {
+          active: true,
+          widgetId,
+        };
+
+
+        setSelectedWidget(
           widgetId
         );
 
@@ -423,1705 +591,466 @@ useEffect(() => {
     );
 
 
-  // =========================================================
-  // FIND CURRENT TARGET
-  // =========================================================
+  // =======================================================
+  // PINCH DRAG MOVE
+  // =======================================================
 
-  const findCurrentTarget =
+  const movePinchDrag =
     useCallback(
-      () => {
+      (
+        screenX,
+        screenY
+      ) => {
 
-        if (!cursorPosition) {
-          return null;
+        if (
+          !pinchRef.current.active
+        ) {
+          return;
         }
+
+
+        const widgetId =
+          pinchRef.current.widgetId;
+
+
+        const dashboard =
+          dashboardRef.current;
 
 
         if (
-          typeof cursorPosition.x !==
-          "number"
+          !dashboard ||
+          !widgetId
         ) {
-          return null;
+          return;
         }
 
 
-        if (
-          typeof cursorPosition.y !==
-          "number"
-        ) {
-          return null;
+        const rect =
+          dashboard.getBoundingClientRect();
+
+
+        const widget =
+          widgets.find(
+            (item) =>
+              item.id === widgetId
+          );
+
+
+        if (!widget) {
+          return;
         }
 
 
-        return findTargetWidget(
-          cursorPosition.x,
-          cursorPosition.y,
-          widgetRefs.current
+        let x =
+          screenX -
+          rect.left -
+          widget.w / 2;
+
+
+        let y =
+          screenY -
+          rect.top -
+          35;
+
+
+        x =
+          Math.max(
+            0,
+            Math.min(
+              1350,
+              x
+            )
+          );
+
+
+        y =
+          Math.max(
+            0,
+            Math.min(
+              1100,
+              y
+            )
+          );
+
+
+        setWidgets(
+          (previous) =>
+            previous.map(
+              (item) =>
+                item.id === widgetId
+                  ? {
+                      ...item,
+                      x,
+                      y,
+                    }
+                  : item
+            )
         );
 
       },
-      [cursorPosition]
+      [widgets]
     );
 
 
-  // =========================================================
-  // EFFECT 1
-  // POINT TARGETING
-  // =========================================================
+  // =======================================================
+  // END PINCH
+  // =======================================================
+
+  const endPinchDrag =
+    useCallback(() => {
+
+      pinchRef.current.active =
+        false;
+
+      pinchRef.current.widgetId =
+        null;
+
+    }, []);
+
+
+  // =======================================================
+  // GESTURE INTERACTION BRIDGE
+  // =======================================================
 
   useEffect(() => {
-
-    if (!cursorPosition) {
-
-      updateHoveredWidget(
-        null
-      );
-
-      return;
-    }
-
-
-    const visible =
-      Boolean(
-        cursorPosition.visible
-      );
-
-
-    // =======================================================
-    // ONLY POINT SHOULD CONTROL HOVER
-    // =======================================================
-
-    if (
-      !visible ||
-      cursorPosition.gesture !==
-        "POINT"
-    ) {
-
-      updateHoveredWidget(
-        null
-      );
-
-      return;
-    }
-
-
-    const x =
-      cursorPosition.x;
-
-    const y =
-      cursorPosition.y;
-
-
-    if (
-      typeof x !== "number" ||
-      typeof y !== "number"
-    ) {
-
-      updateHoveredWidget(
-        null
-      );
-
-      return;
-    }
-
-
-    const target =
-      findTargetWidget(
-        x,
-        y,
-        widgetRefs.current
-      );
-
-
-    updateHoveredWidget(
-      target
-    );
-
-
-  }, [
-    cursorPosition?.x,
-    cursorPosition?.y,
-    cursorPosition?.visible,
-    cursorPosition?.gesture,
-    updateHoveredWidget,
-  ]);
-
-
-  // =========================================================
-  // PROCESS PINCH
-  // =========================================================
-
-  const processPinch =
-    useCallback(() => {
-
-      const target =
-        hoveredWidgetRef.current ||
-        findCurrentTarget();
-
-
-      if (!target) {
-
-        setInteractionMessage(
-          "Point at a widget before pinching."
-        );
-
-        return;
-      }
-
-
-      // SELECT ONLY
-
-      selectWidget(
-        target
-      );
-
-
-      setInteractionMessage(
-        `${target} selected`
-      );
-
-
-      console.log(
-        "PINCH → SELECT:",
-        target
-      );
-      recordInteraction(
-        "PINCH",
-  `     ${target} selected`
-);
-    }, [
-  findCurrentTarget,
-  selectWidget,
-  recordInteraction,
-]);
-
-
-  // =========================================================
-  // PROCESS FIST
-  // =========================================================
-
-  const processFist =
-  useCallback(() => {
-
-    const selected =
-      selectedWidgetRef.current;
-
-
-    if (selected) {
-
-        setActiveAction(
-          null
-        );
-
-
-        clearSelection();
-
-
-        setInteractionMessage(
-          "Widget closed"
-        );
-
-
-        console.log(
-          "FIST → CLOSE"
-        );
-        recordInteraction(
-  "FIST",
-  "Widget closed"
-);
-
-      } else {
-
-        setInteractionMessage(
-          "No selected widget to close."
-        );
-
-      }
-
-    }, [
-  clearSelection,
-  recordInteraction,
-]);
-
-  // =========================================================
-  // PROCESS OPEN PALM
-  // =========================================================
-
-  const processOpenPalm =
-    useCallback(() => {
-
-      setActiveAction(
-        null
-      );
-
-
-      clearSelection();
-
-
-      updateHoveredWidget(
-        null
-      );
-
-
-      setInteractionMessage(
-        "Interaction reset"
-      );
-
-
-      console.log(
-        "OPEN PALM → RESET"
-      );
-      recordInteraction(
-  "OPEN_PALM",
-  "Interaction reset"
-);
-
-    }, [
-  clearSelection,
-  updateHoveredWidget,
-  recordInteraction,
-]);
-
-
-  // =========================================================
-  // PROCESS TWO FINGER
-  // =========================================================
-
-  const processTwoFinger =
-    useCallback(() => {
-
-      const selected =
-        selectedWidgetRef.current;
-
-
-      if (!selected) {
-
-        setInteractionMessage(
-          "Select a widget with PINCH first."
-        );
-
-
-        console.log(
-          "TWO_FINGER → No selected widget"
-        );
-        
-
-
-        return;
-      }
-
-
-      const action =
-        executeWidgetAction(
-          selected
-        );
-
-
-      if (!action) {
-
-        setInteractionMessage(
-          `${selected} secondary action unavailable`
-        );
-
-
-        return;
-      }
-      recordWidgetEvent(
-  selected,
-  "secondary_action"
-);
-
-      setActiveAction(
-        action
-      );
-
-
-      setInteractionMessage(
-        action.message ||
-        `${selected} secondary action`
-      );
-
-
-      console.log(
-        "TWO_FINGER → ACTION:",
-        action
-      );
-      recordInteraction(
-  "TWO_FINGER",
-  action.message ||
-    `${selected} secondary action`
-);
-
-    }, [
-  recordInteraction,
-]);
-
-
-  // =========================================================
-  // GESTURE ENGINE
-  // =========================================================
-
-  useEffect(() => {
-
-    if (!cursorPosition) {
-      return;
-    }
-
 
     const gesture =
       String(
-        cursorPosition.gesture ||
-        "UNKNOWN"
+        cursorPosition?.gesture ||
+          "UNKNOWN"
       ).toUpperCase();
 
 
-    const visible =
-      Boolean(
-        cursorPosition.visible
-      );
-
-// =======================================================
-// GESTURE ANALYTICS
-// Count each newly detected gesture once
-// =======================================================
-
-if (
-  visible &&
-  gesture !== "UNKNOWN" &&
-  previousGestureRef.current !== gesture
-) {
-  recordInteraction(
-    gesture,
-    `${gesture} gesture detected`
-  );
-}
-
-    // =======================================================
-    // UNKNOWN / HAND LOST
-    // =======================================================
-
-    if (
-      !visible &&
-      gesture === "UNKNOWN"
-    ) {
-
-      Object.keys(
-        gestureLockRef.current
-      ).forEach(
-        (key) => {
-
-          gestureLockRef.current[key] =
-            false;
-        }
+    const x =
+      Number(
+        cursorPosition?.x || 0
       );
 
 
-      previousGestureRef.current =
-        "UNKNOWN";
-
-
-      return;
-    }
-
-
-    // =======================================================
-    // RELEASE LOCKS WHEN GESTURE CHANGES
-    // =======================================================
-
-    if (
-      previousGestureRef.current !==
-      gesture
-    ) {
-
-      Object.keys(
-        gestureLockRef.current
-      ).forEach(
-        (key) => {
-
-          if (key !== gesture) {
-
-            gestureLockRef.current[key] =
-              false;
-          }
-
-        }
+    const y =
+      Number(
+        cursorPosition?.y || 0
       );
 
 
-      previousGestureRef.current =
-        gesture;
-    }
-
-
-    // =======================================================
+    // -----------------------------------------------------
     // POINT
-    // =======================================================
+    // -----------------------------------------------------
 
     if (
-      gesture === "POINT"
+      gesture === "POINT" &&
+      cursorPosition.visible
     ) {
+
+      const widgetId =
+        findWidgetAtCursor(
+          x,
+          y
+        );
+
+
+      if (
+        widgetId
+      ) {
+
+        setSelectedWidget(
+          widgetId
+        );
+
+      }
+
+      endPinchDrag();
 
       return;
     }
 
 
-    // =======================================================
+    // -----------------------------------------------------
     // PINCH
-    // =======================================================
+    // -----------------------------------------------------
 
     if (
-      gesture === "PINCH"
+      gesture === "PINCH" &&
+      cursorPosition.visible
     ) {
 
       if (
-        gestureLockRef.current.PINCH
-      ) {
-        return;
-      }
-
-
-      if (
-        cooldownRef.current.PINCH
-      ) {
-        return;
-      }
-
-
-      gestureLockRef.current.PINCH =
-        true;
-
-
-      cooldownRef.current.PINCH =
-        true;
-
-
-      processPinch();
-
-
-      if (
-        timerRef.current.PINCH
+        !pinchRef.current.active
       ) {
 
-        clearTimeout(
-          timerRef.current.PINCH
-        );
-      }
+        const widgetId =
+          findWidgetAtCursor(
+            x,
+            y
+          );
 
 
-      timerRef.current.PINCH =
-        setTimeout(
-          () => {
+        if (widgetId) {
 
-            cooldownRef.current.PINCH =
-              false;
+          startPinchDrag(
+            widgetId
+          );
 
-          },
-          450
+        }
+
+      } else {
+
+        movePinchDrag(
+          x,
+          y
         );
 
+      }
 
       return;
     }
 
 
-    // =======================================================
-    // FIST
-    // =======================================================
-
-    if (
-      gesture === "FIST"
-    ) {
-
-      if (
-        gestureLockRef.current.FIST
-      ) {
-        return;
-      }
-
-
-      if (
-        cooldownRef.current.FIST
-      ) {
-        return;
-      }
-
-
-      gestureLockRef.current.FIST =
-        true;
-
-
-      cooldownRef.current.FIST =
-        true;
-
-
-      processFist();
-
-
-      if (
-        timerRef.current.FIST
-      ) {
-
-        clearTimeout(
-          timerRef.current.FIST
-        );
-      }
-
-
-      timerRef.current.FIST =
-        setTimeout(
-          () => {
-
-            cooldownRef.current.FIST =
-              false;
-
-          },
-          700
-        );
-
-
-      return;
-    }
-
-
-    // =======================================================
-    // OPEN PALM
-    // =======================================================
-
-    if (
-      gesture === "OPEN_PALM"
-    ) {
-
-      if (
-        gestureLockRef.current.OPEN_PALM
-      ) {
-        return;
-      }
-
-
-      if (
-        cooldownRef.current.OPEN_PALM
-      ) {
-        return;
-      }
-
-
-      gestureLockRef.current.OPEN_PALM =
-        true;
-
-
-      cooldownRef.current.OPEN_PALM =
-        true;
-
-
-      processOpenPalm();
-
-
-      if (
-        timerRef.current.OPEN_PALM
-      ) {
-
-        clearTimeout(
-          timerRef.current.OPEN_PALM
-        );
-      }
-
-
-      timerRef.current.OPEN_PALM =
-        setTimeout(
-          () => {
-
-            cooldownRef.current.OPEN_PALM =
-              false;
-
-          },
-          700
-        );
-
-
-      return;
-    }
-
-
-    // =======================================================
+    // -----------------------------------------------------
     // TWO FINGER
-    // =======================================================
+    // -----------------------------------------------------
 
     if (
       gesture === "TWO_FINGER"
     ) {
 
       if (
-        gestureLockRef.current.TWO_FINGER
-      ) {
-        return;
-      }
-
-
-      if (
-        cooldownRef.current.TWO_FINGER
-      ) {
-        return;
-      }
-
-
-      gestureLockRef.current.TWO_FINGER =
-        true;
-
-
-      cooldownRef.current.TWO_FINGER =
-        true;
-
-
-      processTwoFinger();
-
-
-      if (
-        timerRef.current.TWO_FINGER
+        scrollRef.current.lastY ===
+        null
       ) {
 
-        clearTimeout(
-          timerRef.current.TWO_FINGER
-        );
+        scrollRef.current.lastY =
+          y;
+
+      } else {
+
+        const difference =
+          y -
+          scrollRef.current.lastY;
+
+
+        const scrollAmount =
+          difference * 2.5;
+
+
+        window.scrollBy({
+          top:
+            scrollAmount,
+          behavior:
+            "auto",
+        });
+
+
+        scrollRef.current.lastY =
+          y;
+
       }
-
-
-      timerRef.current.TWO_FINGER =
-        setTimeout(
-          () => {
-
-            cooldownRef.current.TWO_FINGER =
-              false;
-
-          },
-          700
-        );
-
 
       return;
     }
 
 
+    // -----------------------------------------------------
+    // FIST
+    // -----------------------------------------------------
+
+    if (
+      gesture === "FIST"
+    ) {
+
+      endPinchDrag();
+
+      return;
+    }
+
+
+    // -----------------------------------------------------
+    // OPEN PALM
+    // -----------------------------------------------------
+
+    if (
+      gesture === "OPEN_PALM"
+    ) {
+
+      endPinchDrag();
+
+      scrollRef.current.lastY =
+        null;
+
+      return;
+    }
+
+
+    // -----------------------------------------------------
+    // UNKNOWN
+    // -----------------------------------------------------
+
+    scrollRef.current.lastY =
+      null;
+
   }, [
-    cursorPosition?.gesture,
-    cursorPosition?.visible,
-    processPinch,
-    processFist,
-    processOpenPalm,
-    processTwoFinger,
+    cursorPosition,
+    findWidgetAtCursor,
+    movePinchDrag,
+    startPinchDrag,
+    endPinchDrag,
   ]);
 
 
-  // =========================================================
-  // WIDGET REF
-  // =========================================================
-
-  const setWidgetRef =
-    useCallback(
-      (
-        widgetId,
-        element
-      ) => {
-
-        if (element) {
-
-          widgetRefs.current[
-            widgetId
-          ] = element;
-
-        } else {
-
-          delete widgetRefs.current[
-            widgetId
-          ];
-        }
-
-      },
-      []
-    );
-
-
-  // =========================================================
-  // MANUAL WIDGET SELECTION
-  // =========================================================
-
-  const handleWidgetSelect =
-    useCallback(
-      (widget) => {
-
-        selectWidget(
-          widget.id
-        );
-
-
-        setInteractionMessage(
-          `${widget.title} selected`
-        );
-
-      },
-      [selectWidget]
-    );
-
-
-  // =========================================================
-  // CLEANUP
-  // =========================================================
+  // =======================================================
+  // GLOBAL POINTER LISTENERS
+  // =======================================================
 
   useEffect(() => {
 
+    window.addEventListener(
+      "pointermove",
+      handlePointerMove
+    );
+
+
+    window.addEventListener(
+      "pointerup",
+      handlePointerUp
+    );
+
+
+    window.addEventListener(
+      "pointercancel",
+      handlePointerUp
+    );
+
+
     return () => {
 
-      Object.values(
-        timerRef.current
-      ).forEach(
-        (timer) => {
-
-          if (timer) {
-
-            clearTimeout(
-              timer
-            );
-          }
-
-        }
+      window.removeEventListener(
+        "pointermove",
+        handlePointerMove
       );
 
 
-      widgetRefs.current =
-        {};
+      window.removeEventListener(
+        "pointerup",
+        handlePointerUp
+      );
 
 
-      hoveredWidgetRef.current =
-        null;
-
-
-      selectedWidgetRef.current =
-        null;
+      window.removeEventListener(
+        "pointercancel",
+        handlePointerUp
+      );
 
     };
 
-  }, []);
+  }, [
+    handlePointerMove,
+    handlePointerUp,
+  ]);
 
 
-  // =========================================================
+  // =======================================================
   // RENDER
-  // =========================================================
+  // =======================================================
 
   return (
 
-   <section
-  className="
-    relative
-    min-h-screen
-    overflow-hidden
-    bg-slate-950
-    bg-transparent
-    px-4
-    pb-12
-    pt-8
-    sm:px-6
-    lg:px-8
-  "
->
-{/* =====================================================
-    AI / AR AMBIENT BACKGROUND
-====================================================== */}
+    <section
+      className="
+        relative
+        min-h-screen
+        w-full
+        overflow-x-hidden
+        bg-[#020617]
+        px-3
+        pb-20
+        pt-5
+        sm:px-5
+        lg:px-7
+      "
+    >
 
-<div className="pointer-events-none absolute inset-0 overflow-hidden">
-
-  {/* Cyan ambient orb */}
-  <div
-    className="
-      absolute
-      -left-32
-      top-20
-      h-80
-      w-80
-      rounded-full
-      bg-cyan-500/10
-      blur-[100px]
-      animate-[pulse_6s_ease-in-out_infinite]
-    "
-  />
-
-  {/* Purple ambient orb */}
-  <div
-    className="
-      absolute
-      right-[-120px]
-      top-1/3
-      h-96
-      w-96
-      rounded-full
-      bg-purple-500/10
-      blur-[120px]
-      animate-[pulse_8s_ease-in-out_infinite]
-    "
-  />
-
-  {/* Blue ambient orb */}
-  <div
-    className="
-      absolute
-      bottom-[-150px]
-      left-1/2
-      h-96
-      w-96
-      -translate-x-1/2
-      rounded-full
-      bg-blue-500/5
-      blur-[120px]
-      animate-[pulse_10s_ease-in-out_infinite]
-    "
-  />
-
-  {/* Moving scan line */}
-  <div
-    className="
-      absolute
-      left-0
-      top-0
-      h-px
-      w-full
-      bg-gradient-to-r
-      from-transparent
-      via-cyan-400/30
-      to-transparent
-      animate-[scan_7s_linear_infinite]
-    "
-  />
-
-</div>
-      {/* =====================================================
-          VIRTUAL CURSOR
-      ====================================================== */}
-
-
- {/* =====================================================
-    FUTURISTIC AR BACKGROUND
-===================================================== */}
-
-<div className="pointer-events-none absolute inset-0 overflow-hidden">
-
-  {/* Base atmospheric glow */}
-  <div
-    className="
-      absolute
-      -left-40
-      top-20
-      h-96
-      w-96
-      rounded-full
-      bg-cyan-500/10
-      blur-[120px]
-      animate-pulse
-    "
-  />
-
-  <div
-    className="
-      absolute
-      -right-40
-      top-[30%]
-      h-[420px]
-      w-[420px]
-      rounded-full
-      bg-purple-500/10
-      blur-[130px]
-      animate-pulse
-    "
-  />
-
-  <div
-    className="
-      absolute
-      bottom-[-180px]
-      left-1/2
-      h-[420px]
-      w-[420px]
-      -translate-x-1/2
-      rounded-full
-      bg-blue-500/5
-      blur-[120px]
-    "
-  />
-
-  {/* AR Grid */}
-  <div
-    className="absolute inset-0 opacity-[0.055]"
-    style={{
-      backgroundImage: `
-        linear-gradient(
-          rgba(34,211,238,0.5) 1px,
-          transparent 1px
-        ),
-        linear-gradient(
-          90deg,
-          rgba(34,211,238,0.5) 1px,
-          transparent 1px
-        )
-      `,
-      backgroundSize: "50px 50px",
-      maskImage:
-        "linear-gradient(to bottom, black 0%, transparent 90%)",
-      WebkitMaskImage:
-        "linear-gradient(to bottom, black 0%, transparent 90%)",
-    }}
-  />
-
-  {/* Moving scan beam */}
-  <div
-    className="
-      absolute
-      left-0
-      top-0
-      h-px
-      w-full
-      bg-gradient-to-r
-      from-transparent
-      via-cyan-300/60
-      to-transparent
-      animate-[arScan_6s_linear_infinite]
-    "
-  />
-
-  {/* Center AI core */}
-  <div
-    className="
-      absolute
-      left-1/2
-      top-1/2
-      h-[520px]
-      w-[520px]
-      -translate-x-1/2
-      -translate-y-1/2
-      rounded-full
-      bg-cyan-400/[0.025]
-      blur-3xl
-    "
-  />
-
-</div>
-      {/* =====================================================
-          MAIN
-      ====================================================== */}
-
-      <div
-  className="
-    relative
-    mx-auto
-    w-full
-    max-w-[1500px]
-    animate-[dashboardEnter_0.8s_ease-out]
-  "
->
-       {/* ===================================================
-    PROFESSIONAL AR HEADER
-==================================================== */}
-
-<div
-  className="
-    relative
-    mb-8
-    overflow-hidden
-    rounded-3xl
-    border
-    border-cyan-500/10
-    bg-slate-950/40
-    px-6
-    py-6
-    backdrop-blur-xl
-  "
->
-
-  {/* =================================================
-      HEADER GLOW
-  ================================================== */}
-
-  <div
-    className="
-      pointer-events-none
-      absolute
-      -right-24
-      -top-24
-      h-64
-      w-64
-      rounded-full
-      bg-cyan-500/10
-      blur-3xl
-    "
-  />
-
-  <div
-    className="
-      pointer-events-none
-      absolute
-      -bottom-32
-      left-1/3
-      h-56
-      w-56
-      rounded-full
-      bg-purple-500/5
-      blur-3xl
-    "
-  />
-
-
-  {/* =================================================
-      ANIMATED TOP LINE
-  ================================================== */}
-
-  <div
-    className="
-      pointer-events-none
-      absolute
-      left-0
-      top-0
-      h-px
-      w-full
-      bg-gradient-to-r
-      from-transparent
-      via-cyan-400/70
-      to-transparent
-      animate-pulse
-    "
-  />
-
-
-  <div
-    className="
-      relative
-      flex
-      flex-col
-      gap-6
-      lg:flex-row
-      lg:items-center
-      lg:justify-between
-    "
-  >
-
-    {/* =================================================
-        TITLE AREA
-    ================================================== */}
-
-    <div>
-
-      {/* SYSTEM LABEL */}
+      {/* ===================================================
+          AMBIENT BACKGROUND
+      ================================================== */}
 
       <div
         className="
-          mb-3
-          flex
-          items-center
-          gap-3
+          pointer-events-none
+          fixed
+          inset-0
+          z-0
+          overflow-hidden
         "
       >
 
         <div
           className="
-            relative
-            flex
-            h-6
-            w-6
-            items-center
-            justify-center
-            rounded-md
-            border
-            border-cyan-400/30
-            bg-cyan-400/10
+            absolute
+            -left-32
+            top-20
+            h-[500px]
+            w-[500px]
+            rounded-full
+            bg-cyan-500/[0.025]
+            blur-[140px]
           "
-        >
+        />
 
-          <span
-            className="
-              h-1.5
-              w-1.5
-              rounded-full
-              bg-cyan-300
-              shadow-[0_0_10px_rgba(34,211,238,1)]
-              animate-pulse
-            "
-          />
-
-        </div>
-
-
-        <span
+        <div
           className="
-            text-[10px]
-            font-medium
-            uppercase
-            tracking-[0.3em]
-            text-cyan-400
+            absolute
+            -right-40
+            top-[25%]
+            h-[550px]
+            w-[550px]
+            rounded-full
+            bg-purple-500/[0.025]
+            blur-[150px]
           "
-        >
-          AI / AR CONTROL SYSTEM
-        </span>
+        />
 
-
-        <span
+        <div
           className="
-            hidden
-            h-px
-            w-16
-            bg-gradient-to-r
-            from-cyan-400/40
-            to-transparent
-            sm:block
+            absolute
+            bottom-[-200px]
+            left-1/2
+            h-[500px]
+            w-[500px]
+            -translate-x-1/2
+            rounded-full
+            bg-blue-500/[0.02]
+            blur-[140px]
           "
         />
 
       </div>
 
 
-      {/* TITLE */}
-
-      <h1
-        className="
-          text-3xl
-          font-semibold
-          tracking-tight
-          text-white
-          md:text-4xl
-        "
-      >
-
-        Intelligent{" "}
-
-        <span
-          className="
-            bg-gradient-to-r
-            from-cyan-300
-            via-cyan-400
-            to-purple-400
-            bg-clip-text
-            text-transparent
-          "
-        >
-          AR Dashboard
-        </span>
-
-      </h1>
-
-
-      {/* DESCRIPTION */}
-
-      <p
-        className="
-          mt-3
-          max-w-2xl
-          text-sm
-          leading-relaxed
-          text-slate-400
-        "
-      >
-        Real-time computer vision, gesture intelligence,
-        and spatial interaction in a unified interface.
-      </p>
-
-
-      {/* TECHNOLOGY TAGS */}
+      {/* ===================================================
+          CONTENT
+      ================================================== */}
 
       <div
         className="
-          mt-5
-          flex
-          flex-wrap
-          gap-2
+          relative
+          z-10
+          mx-auto
+          w-full
+          max-w-[1600px]
         "
       >
 
-        <span
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <header
           className="
-            rounded-lg
-            border
-            border-cyan-500/20
-            bg-cyan-500/5
-            px-2.5
-            py-1.5
-            text-[9px]
-            uppercase
-            tracking-wider
-            text-cyan-300
-          "
-        >
-          Computer Vision
-        </span>
-
-
-        <span
-          className="
-            rounded-lg
-            border
-            border-purple-500/20
-            bg-purple-500/5
-            px-2.5
-            py-1.5
-            text-[9px]
-            uppercase
-            tracking-wider
-            text-purple-300
-          "
-        >
-          Gesture AI
-        </span>
-
-
-        <span
-          className="
-            rounded-lg
-            border
-            border-blue-500/20
-            bg-blue-500/5
-            px-2.5
-            py-1.5
-            text-[9px]
-            uppercase
-            tracking-wider
-            text-blue-300
-          "
-        >
-          Spatial UI
-        </span>
-
-      </div>
-
-    </div>
-
-
-    {/* =================================================
-        SYSTEM TELEMETRY
-    ================================================== */}
-
-    <div
-      className="
-        grid
-        grid-cols-2
-        gap-2
-        sm:grid-cols-4
-        lg:grid-cols-2
-        xl:grid-cols-4
-      "
-    >
-
-      {/* STATUS */}
-
-      <div
-        className="
-          min-w-[105px]
-          rounded-xl
-          border
-          border-slate-800
-          bg-slate-950/70
-          px-4
-          py-3
-          backdrop-blur-xl
-        "
-      >
-
-        <div
-          className="
-            text-[9px]
-            uppercase
-            tracking-[0.16em]
-            text-slate-600
-          "
-        >
-          System
-        </div>
-
-        <div
-          className="
-            mt-2
-            flex
-            items-center
-            gap-2
-            text-xs
-            font-medium
-          "
-        >
-
-          <span
-            className={`
-              h-1.5
-              w-1.5
-              rounded-full
-              ${
-                backendStatus === "ONLINE"
-                  ? `
-                    bg-emerald-400
-                    shadow-[0_0_8px_rgba(52,211,153,0.9)]
-                  `
-                  : backendStatus === "CONNECTING"
-                  ? `
-                    bg-yellow-400
-                    shadow-[0_0_8px_rgba(250,204,21,0.8)]
-                  `
-                  : `
-                    bg-red-400
-                    shadow-[0_0_8px_rgba(248,113,113,0.8)]
-                  `
-              }
-            `}
-          />
-
-          <span
-            className={
-              backendStatus === "ONLINE"
-                ? "text-emerald-400"
-                : backendStatus === "CONNECTING"
-                ? "text-yellow-400"
-                : "text-red-400"
-            }
-          >
-            {backendStatus}
-          </span>
-
-        </div>
-
-      </div>
-
-
-      {/* VISION */}
-
-      <div
-        className="
-          min-w-[105px]
-          rounded-xl
-          border
-          border-slate-800
-          bg-slate-950/70
-          px-4
-          py-3
-          backdrop-blur-xl
-        "
-      >
-
-        <div
-          className="
-            text-[9px]
-            uppercase
-            tracking-[0.16em]
-            text-slate-600
-          "
-        >
-          Vision
-        </div>
-
-        <div
-          className="
-            mt-2
-            text-xs
-            font-medium
-            text-cyan-400
-          "
-        >
-          {visionStatus?.opencv || "INITIALIZING"}
-        </div>
-
-      </div>
-
-
-      {/* HAND */}
-
-      <div
-        className="
-          min-w-[105px]
-          rounded-xl
-          border
-          border-slate-800
-          bg-slate-950/70
-          px-4
-          py-3
-          backdrop-blur-xl
-        "
-      >
-
-        <div
-          className="
-            text-[9px]
-            uppercase
-            tracking-[0.16em]
-            text-slate-600
-          "
-        >
-          Hand AI
-        </div>
-
-        <div
-          className={`
-            mt-2
-            flex
-            items-center
-            gap-2
-            text-xs
-            font-medium
-            text-purple-400
-            ${
-              pipelineStatus?.mediapipe === "ready" ||
-              pipelineStatus?.mediapipe === "initialized"
-                ? "text-emerald-400"
-                : "text-purple-400"
-            }
-          `}
-        >
-
-          <span className="text-sm">
-            ✋
-          </span>
-
-         {pipelineStatus?.mediapipe === "ready" ||
- pipelineStatus?.mediapipe === "initialized"
-  ? "READY"
-  : pipelineStatus?.mediapipe === "not_initialized"
-  ? "INITIALIZING"
-  : pipelineStatus?.mediapipe || "WAITING"}
-        </div>
-
-      </div>
-
-
-      {/* EVENTS */}
-
-      <div
-        className="
-          min-w-[105px]
-          rounded-xl
-          border
-          border-slate-800
-          bg-slate-950/70
-          px-4
-          py-3
-          backdrop-blur-xl
-        "
-      >
-
-        <div
-          className="
-            text-[9px]
-            uppercase
-            tracking-[0.16em]
-            text-slate-600
-          "
-        >
-          Events
-        </div>
-
-        <div
-          className="
-            mt-2
-            text-xs
-            font-medium
-            text-yellow-400
-          "
-        >
-          {interactionCount}
-          <span className="ml-1 text-slate-600">
-            processed
-          </span>
-        </div>
-
-      </div>
-
-    </div>
-
-  </div>
-
-
-  {/* =================================================
-      BOTTOM TELEMETRY LINE
-  ================================================== */}
-
-  <div
-    className="
-      relative
-      mt-6
-      flex
-      items-center
-      justify-between
-      border-t
-      border-slate-800/70
-      pt-4
-    "
-  >
-
-    <div
-      className="
-        flex
-        items-center
-        gap-2
-        text-[9px]
-        uppercase
-        tracking-[0.18em]
-        text-slate-600
-      "
-    >
-
-      <span>
-        AR NETWORK
-      </span>
-
-      <span className="text-slate-800">
-        /
-      </span>
-
-      <span>
-        REALTIME
-      </span>
-
-      <span className="text-slate-800">
-        /
-      </span>
-
-      <span className="text-cyan-500/60">
-        ACTIVE
-      </span>
-
-    </div>
-
-
-    <div
-      className="
-        hidden
-        items-center
-        gap-2
-        text-[9px]
-        uppercase
-        tracking-[0.18em]
-        text-slate-600
-        sm:flex
-      "
-    >
-
-      <span>
-        Gesture Interface
-      </span>
-
-      <span
-        className="
-          h-1
-          w-1
-          rounded-full
-          bg-cyan-400/70
-          animate-pulse
-        "
-      />
-
-      <span>
-        Spatial Control
-      </span>
-
-    </div>
-
-  </div>
-
-</div>
-        {/* ===================================================
-            WIDGETS
-        ==================================================== */}
-
-        <div
-  className="
-    grid
-    gap-4
-    sm:grid-cols-2
-    xl:grid-cols-4
-  "
->
-
-          {widgets.map(
-            (widget) => (
-
-              <ARWidget
-                key={
-                  widget.id
-                }
-
-                ref={
-                  (element) =>
-                    setWidgetRef(
-                      widget.id,
-                      element
-                    )
-                }
-
-                title={
-                  widget.title
-                }
-
-                value={
-                  widget.value
-                }
-
-                description={
-                  widget.description
-                }
-
-                icon={
-                  widget.icon
-                }
-
-                selected={
-                  selectedWidget ===
-                  widget.id
-                }
-
-                hovered={
-                  hoveredWidget ===
-                  widget.id
-                }
-
-                onSelect={() =>
-                  handleWidgetSelect(
-                    widget
-                  )
-                }
-              />
-
-            )
-          )}
-
-        </div>
-
-
-        {/* ===================================================
-            ANALYTICS
-        ==================================================== */}
-
-        <div
-          className="
-            mt-4
-            grid
-            gap-4
-            lg:grid-cols-3
-          "
-        >
-
-          <div
-            className="
-              lg:col-span-2
-            "
-          >
-
-            <PerformanceChart />
-
-          </div>
-
-
-          <SystemStatus />
-
-        </div>
-
-
-        {/* ===================================================
-            GESTURE STATUS
-        ==================================================== */}
-
-        <div
-          className="
-            mt-6
+            mb-5
             rounded-2xl
             border
-            border-cyan-500/10
-            bg-cyan-500/5
+            border-white/[0.07]
+            bg-slate-950/80
             p-5
             backdrop-blur-xl
           "
@@ -2132,616 +1061,1850 @@ if (
               flex
               flex-col
               gap-5
+              xl:flex-row
+              xl:items-center
+              xl:justify-between
             "
           >
 
-            <div>
+            <div className="min-w-0">
 
               <div
                 className="
-                  text-xs
-                  uppercase
-                  tracking-wider
-                  text-cyan-400
+                  flex
+                  items-center
+                  gap-3
                 "
               >
-                Gesture Interface
+
+                <div
+                  className="
+                    flex
+                    h-10
+                    w-10
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    border
+                    border-cyan-400/20
+                    bg-cyan-400/5
+                  "
+                >
+
+                  <BrainCircuit
+                    size={19}
+                    className="text-cyan-300"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <div
+                    className="
+                      text-[9px]
+                      uppercase
+                      tracking-[0.3em]
+                      text-cyan-400
+                    "
+                  >
+                    Intelligence Layer
+                  </div>
+
+                  <h1
+                    className="
+                      mt-1
+                      text-xl
+                      font-semibold
+                      text-white
+                    "
+                  >
+                    AI Vision Dashboard
+                  </h1>
+
+                </div>
+
               </div>
 
 
               <p
                 className="
-                  mt-2
-                  text-sm
-                  text-slate-400
+                  mt-3
+                  max-w-3xl
+                  text-xs
+                  leading-6
+                  text-slate-500
                 "
               >
-                POINT to move •
-                PINCH to select •
-                FIST to close •
-                OPEN PALM to reset •
-                TWO FINGER for secondary action.
+                Universal spatial interaction workspace
+                with hand tracking, gesture control,
+                selectable widgets, scrolling and
+                movable dashboard content.
               </p>
-
-
-              <div
-  className="
-    mt-3
-    text-xs
-    text-purple-300
-  "
->
-  {interactionMessage}
-</div>
-
-<div
-  className="
-    mt-2
-    text-xs
-    text-slate-500
-  "
->
-  Last event: {lastInteraction}
-</div>
 
             </div>
 
 
-            {/* GESTURE STATUS */}
+            {/* HEADER CONTROLS */}
 
-            <GestureStatus
-              gesture={
-                cursorPosition?.gesture
-              }
+            <div
+              className="
+                grid
+                grid-cols-2
+                gap-2
+                sm:grid-cols-4
+              "
+            >
 
-              confidence={
-                cursorPosition?.confidence
+              <ControlButton
+                icon={<MousePointer2 size={12} />}
+                label="POINT"
+                value="TARGET"
+              />
+
+              <ControlButton
+                icon={<Hand size={12} />}
+                label="PINCH"
+                value="MOVE"
+              />
+
+              <ControlButton
+                icon={<Move size={12} />}
+                label="TWO FINGER"
+                value="SCROLL"
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  resetLayout();
+
+                  onResetGestureStats?.();
+                }}
+                className="
+                  flex
+                  min-h-[34px]
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-lg
+                  border
+                  border-slate-800
+                  bg-slate-900/70
+                  px-3
+                  text-[9px]
+                  uppercase
+                  tracking-wider
+                  text-slate-400
+                  transition
+                  hover:border-cyan-400/30
+                  hover:text-cyan-300
+                "
+              >
+
+                <RefreshCw size={12} />
+
+                RESET
+
+              </button>
+
+            </div>
+
+          </div>
+
+
+          {/* SYSTEM TELEMETRY */}
+
+          <div
+            className="
+              mt-5
+              grid
+              gap-3
+              border-t
+              border-white/[0.05]
+              pt-4
+              sm:grid-cols-2
+              lg:grid-cols-4
+            "
+          >
+
+            <Telemetry
+              icon={<Radio size={13} />}
+              label="SYSTEM"
+              value="ONLINE"
+              active
+            />
+
+            <Telemetry
+              icon={<Hand size={13} />}
+              label="HAND"
+              value={
+                cursorPosition.gesture ===
+                "UNKNOWN"
+                  ? "SEARCHING"
+                  : "TRACKED"
               }
             />
 
+            <Telemetry
+              icon={<Target size={13} />}
+              label="GESTURE"
+              value={
+                cursorPosition.gesture
+              }
+            />
 
-            {/* GESTURE INDICATORS */}
+            <Telemetry
+              icon={<ShieldCheck size={13} />}
+              label="CONFIDENCE"
+              value={`${Math.round(
+                Number(
+                  cursorPosition.confidence ||
+                    0
+                ) * 100
+              )}%`}
+            />
+
+          </div>
+
+        </header>
+
+
+        {/* =================================================
+            INTERACTION INSTRUCTIONS
+        ================================================= */}
+
+        <section
+          className="
+            mb-5
+            rounded-2xl
+            border
+            border-cyan-400/10
+            bg-slate-950/70
+            p-4
+            backdrop-blur-xl
+          "
+        >
+
+          <div
+            className="
+              flex
+              flex-wrap
+              items-center
+              gap-3
+            "
+          >
 
             <div
               className="
                 flex
-                flex-wrap
+                items-center
                 gap-2
-                text-xs
+                text-[9px]
+                uppercase
+                tracking-[0.2em]
+                text-cyan-300
               "
             >
 
-              <span
-                className="
-                  rounded-lg
-                  border
-                  border-cyan-500/30
-                  bg-cyan-500/10
-                  px-3
-                  py-2
-                  text-cyan-300
-                "
+              <Zap size={13} />
+
+              Spatial Controls
+
+            </div>
+
+
+            <Instruction
+              gesture="POINT"
+              action="Target / Select"
+            />
+
+            <Instruction
+              gesture="PINCH"
+              action="Select + Drag"
+            />
+
+            <Instruction
+              gesture="TWO FINGER"
+              action="Scroll"
+            />
+
+            <Instruction
+              gesture="FIST"
+              action="Cancel"
+            />
+
+            <Instruction
+              gesture="OPEN PALM"
+              action="Reset"
+            />
+
+          </div>
+
+        </section>
+
+
+        {/* =================================================
+            FREEFORM DASHBOARD
+        ================================================= */}
+
+        <section
+          ref={dashboardRef}
+          data-ar-scroll-container
+          className="
+            relative
+            min-h-[1150px]
+            w-full
+            overflow-visible
+            rounded-2xl
+            border
+            border-white/[0.05]
+            bg-slate-950/40
+          "
+          style={{
+            minWidth:
+              "min(100%, 1450px)",
+          }}
+        >
+
+          {/* GRID */}
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              inset-0
+              rounded-2xl
+              opacity-30
+            "
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(34,211,238,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.04) 1px, transparent 1px)",
+              backgroundSize:
+                "40px 40px",
+            }}
+          />
+
+
+          {/* WORKSPACE LABEL */}
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              left-4
+              top-4
+              z-[1]
+              rounded-full
+              border
+              border-slate-800
+              bg-slate-950/80
+              px-3
+              py-1.5
+              text-[8px]
+              uppercase
+              tracking-[0.2em]
+              text-slate-600
+            "
+          >
+            FREEFORM DASHBOARD
+          </div>
+
+
+          {/* WIDGETS */}
+
+          {widgets.map(
+            (widget) => (
+
+              <DashboardWidget
+                key={widget.id}
+                widget={widget}
+                selected={
+                  selectedWidget ===
+                  widget.id
+                }
+                onSelect={
+                  selectWidget
+                }
+                onPointerDown={
+                  handlePointerDown
+                }
               >
-                ☝ POINT
-              </span>
+
+                {renderWidgetContent(
+                  widget.id,
+                  gestureStats,
+                  getGesturePercentage,
+                  totalGestures
+                )}
+
+              </DashboardWidget>
+
+            )
+          )}
+
+        </section>
 
 
-              <span
-                className="
-                  rounded-lg
-                  border
-                  border-purple-500/30
-                  bg-purple-500/10
-                  px-3
-                  py-2
-                  text-purple-300
-                "
-              >
-                🤏 PINCH
-              </span>
+        {/* =================================================
+            GESTURE DISTRIBUTION
+        ================================================= */}
+
+        <section
+          className="
+            mt-5
+            rounded-2xl
+            border
+            border-white/[0.07]
+            bg-slate-950/80
+            p-5
+            backdrop-blur-xl
+          "
+        >
+
+          <SectionHeader
+            icon={
+              <Activity
+                size={15}
+              />
+            }
+            eyebrow="INTERACTION ENGINE"
+            title="Gesture Distribution"
+            right={`${totalGestures} EVENTS`}
+          />
 
 
-              <span
-                className="
-                  rounded-lg
-                  border
-                  border-red-500/30
-                  bg-red-500/10
-                  px-3
-                  py-2
-                  text-red-300
-                "
-              >
-                ✊ FIST
-              </span>
+          <div
+            className="
+              mt-5
+              grid
+              gap-4
+              lg:grid-cols-2
+          "
+          >
+
+            {GESTURES.map(
+              (item) => {
+
+                const count =
+                  Number(
+                    gestureStats?.[
+                      item.id
+                    ] || 0
+                  );
 
 
-              <span
-                className="
-                  rounded-lg
-                  border
-                  border-emerald-500/30
-                  bg-emerald-500/10
-                  px-3
-                  py-2
-                  text-emerald-300
-                "
-              >
-                ✋ PALM
-              </span>
+                const percentage =
+                  getGesturePercentage(
+                    item.id
+                  );
 
 
-              <span
-                className="
-                  rounded-lg
-                  border
-                  border-yellow-500/30
-                  bg-yellow-500/10
-                  px-3
-                  py-2
-                  text-yellow-300
-                "
-              >
-                ✌ TWO
-              </span>
+                return (
 
+                  <div
+                    key={item.id}
+                    className="
+                      rounded-xl
+                      border
+                      border-white/[0.05]
+                      bg-slate-900/50
+                      p-4
+                    "
+                  >
+
+                    <div
+                      className="
+                        flex
+                        items-center
+                        justify-between
+                      "
+                    >
+
+                      <div
+                        className="
+                          flex
+                          items-center
+                          gap-3
+                        "
+                      >
+
+                        <span className="text-lg">
+                          {item.icon}
+                        </span>
+
+                        <span
+                          className={`
+                            text-xs
+                            font-medium
+                            ${item.color}
+                          `}
+                        >
+                          {item.label}
+                        </span>
+
+                      </div>
+
+
+                      <div
+                        className="
+                          text-right
+                        "
+                      >
+
+                        <div
+                          className="
+                            text-xs
+                            font-semibold
+                            text-white
+                          "
+                        >
+                          {count}
+                        </div>
+
+                        <div
+                          className="
+                            text-[8px]
+                            text-slate-600
+                          "
+                        >
+                          {percentage}%
+                        </div>
+
+                      </div>
+
+                    </div>
+
+
+                    <div
+                      className="
+                        mt-3
+                        h-1.5
+                        overflow-hidden
+                        rounded-full
+                        bg-slate-800
+                      "
+                    >
+
+                      <div
+                        className={`
+                          h-full
+                          rounded-full
+                          transition-all
+                          duration-500
+                          ${item.bar}
+                        `}
+                        style={{
+                          width:
+                            `${percentage}%`,
+                        }}
+                      />
+
+                    </div>
+
+                  </div>
+
+                );
+
+              }
+            )}
+
+          </div>
+
+        </section>
+
+      </div>
+
+    </section>
+  );
+}
+
+
+/* =========================================================
+   DASHBOARD WIDGET
+========================================================= */
+
+function DashboardWidget({
+  widget,
+  selected,
+  onSelect,
+  onPointerDown,
+  children,
+}) {
+
+  return (
+
+    <article
+      data-ar-widget-id={
+        widget.id
+      }
+      className={`
+        absolute
+        select-none
+        rounded-2xl
+        border
+        bg-slate-950/90
+        backdrop-blur-xl
+        transition-shadow
+        duration-150
+        ${
+          selected
+            ? "z-50 border-cyan-400/60 shadow-[0_0_35px_rgba(34,211,238,0.18)]"
+            : "z-10 border-white/[0.07] shadow-[0_15px_50px_rgba(0,0,0,0.25)]"
+        }
+      `}
+      style={{
+        left:
+          widget.x,
+        top:
+          widget.y,
+        width:
+          widget.w,
+        minHeight:
+          widget.h,
+      }}
+      onClick={() =>
+        onSelect(
+          widget.id
+        )
+      }
+    >
+
+      {/* WIDGET HEADER */}
+
+      <div
+        className="
+          flex
+          cursor-grab
+          items-center
+          justify-between
+          border-b
+          border-white/[0.05]
+          px-4
+          py-3
+          active:cursor-grabbing
+        "
+        onPointerDown={(event) =>
+          onPointerDown(
+            event,
+            widget.id
+          )
+        }
+      >
+
+        <div
+          className="
+            flex
+            min-w-0
+            items-center
+            gap-2
+          "
+        >
+
+          <Grip
+            size={14}
+            className="
+              shrink-0
+              text-slate-600
+            "
+          />
+
+          <div className="min-w-0">
+
+            <div
+              className="
+                truncate
+                text-[9px]
+                uppercase
+                tracking-[0.18em]
+                text-cyan-400
+              "
+            >
+              {widget.subtitle}
+            </div>
+
+            <div
+              className="
+                mt-1
+                truncate
+                text-xs
+                font-semibold
+                text-white
+              "
+            >
+              {widget.title}
             </div>
 
           </div>
 
         </div>
 
-{/* ===================================================
-    GESTURE ANALYTICS
-==================================================== */}
 
-<div
-  className="
-    mt-6
-    rounded-2xl
-    border
-    border-slate-700
-    bg-slate-900/60
-    p-5
-    backdrop-blur-xl
-  "
->
+        {selected && (
 
-  <div
-    className="
-      mb-4
-      flex
-      items-center
-      justify-between
-    "
-  >
+          <div
+            className="
+              flex
+              items-center
+              gap-1
+              rounded-full
+              border
+              border-cyan-400/20
+              bg-cyan-400/5
+              px-2
+              py-1
+              text-[7px]
+              uppercase
+              tracking-wider
+              text-cyan-300
+            "
+          >
 
-    <div>
+            <Move size={9} />
 
-      <div
-        className="
-          text-xs
-          uppercase
-          tracking-wider
-          text-purple-400
-        "
-      >
-        Gesture Analytics
+            MOVE
+
+          </div>
+
+        )}
+
       </div>
 
-      <div
-        className="
-          mt-1
-          text-sm
-          text-slate-400
-        "
-      >
-        Real-time AR interaction statistics
+
+      {/* CONTENT */}
+
+      <div className="p-4">
+        {children}
       </div>
 
-    </div>
+    </article>
+  );
+}
+
+
+/* =========================================================
+   WIDGET CONTENT
+========================================================= */
+
+function renderWidgetContent(
+  id,
+  gestureStats,
+  getGesturePercentage,
+  totalGestures
+) {
+
+  switch (id) {
+
+    case "system":
+
+      return (
+        <div className="space-y-3">
+
+          <StatusRow
+            icon={
+              <Server
+                size={14}
+              />
+            }
+            label="Backend"
+            value="ONLINE"
+            active
+          />
+
+          <StatusRow
+            icon={
+              <ScanLine
+                size={14}
+              />
+            }
+            label="Computer Vision"
+            value="READY"
+            active
+          />
+
+          <StatusRow
+            icon={
+              <Database
+                size={14}
+              />
+            }
+            label="Object Detection"
+            value="STANDBY"
+          />
+
+          <StatusRow
+            icon={
+              <Radio
+                size={14}
+              />
+            }
+            label="Interaction Layer"
+            value="ACTIVE"
+            active
+          />
+
+        </div>
+      );
+
+
+    case "users":
+
+      return (
+        <MetricContent
+          icon={
+            <Users
+              size={18}
+            />
+          }
+          value="128"
+          label="ACTIVE SESSIONS"
+          detail="+12.4%"
+        />
+      );
+
+
+    case "processing":
+
+      return (
+        <MetricContent
+          icon={
+            <Zap
+              size={18}
+            />
+          }
+          value="42"
+          label="FRAMES / SEC"
+          detail="LOW LATENCY"
+        />
+      );
+
+
+    case "analytics":
+
+      return (
+        <MetricContent
+          icon={
+            <BarChart3
+              size={18}
+            />
+          }
+          value="98.6%"
+          label="PIPELINE HEALTH"
+          detail="STABLE"
+        />
+      );
+
+
+    case "table":
+
+      return (
+        <DataTable />
+      );
+
+
+    case "activity":
+
+      return (
+        <ActivityContent />
+      );
+
+
+    case "gesture":
+
+      return (
+        <GestureMiniPanel
+          gestureStats={
+            gestureStats
+          }
+          getGesturePercentage={
+            getGesturePercentage
+          }
+          totalGestures={
+            totalGestures
+          }
+        />
+      );
+
+
+    case "pipeline":
+
+      return (
+        <PipelineContent />
+      );
+
+
+    case "insight":
+
+      return (
+        <InsightContent />
+      );
+
+
+    default:
+
+      return null;
+  }
+}
+
+
+/* =========================================================
+   STATUS ROW
+========================================================= */
+
+function StatusRow({
+  icon,
+  label,
+  value,
+  active = false,
+}) {
+
+  return (
 
     <div
       className="
+        flex
+        items-center
+        justify-between
         rounded-lg
         border
-        border-purple-500/30
-        bg-purple-500/10
+        border-white/[0.04]
+        bg-white/[0.015]
         px-3
-        py-2
-        text-xs
-        text-purple-400
+        py-2.5
       "
     >
-      {interactionCount} EVENTS
+
+      <div
+        className="
+          flex
+          items-center
+          gap-2
+        "
+      >
+
+        <span className="text-cyan-300">
+          {icon}
+        </span>
+
+        <span
+          className="
+            text-[9px]
+            text-slate-400
+          "
+        >
+          {label}
+        </span>
+
+      </div>
+
+
+      <span
+        className={`
+          text-[9px]
+          font-semibold
+          ${
+            active
+              ? "text-emerald-400"
+              : "text-amber-300"
+          }
+        `}
+      >
+        {value}
+      </span>
+
     </div>
+  );
+}
 
-  </div>
+
+/* =========================================================
+   METRIC
+========================================================= */
+
+function MetricContent({
+  icon,
+  value,
+  label,
+  detail,
+}) {
+
+  return (
+
+    <div
+      className="
+        flex
+        h-full
+        flex-col
+        justify-between
+      "
+    >
+
+      <div
+        className="
+          flex
+          h-11
+          w-11
+          items-center
+          justify-center
+          rounded-xl
+          border
+          border-cyan-400/20
+          bg-cyan-400/5
+          text-cyan-300
+        "
+      >
+        {icon}
+      </div>
 
 
-  <div
-    className="
-      grid
-      grid-cols-2
-      gap-3
-      md:grid-cols-5
-    "
-  >
-
-    {[
-      ["POINT", "Point"],
-      ["PINCH", "Pinch"],
-      ["TWO_FINGER", "Two Finger"],
-      ["FIST", "Fist"],
-      ["OPEN_PALM", "Open Palm"],
-    ].map(
-      ([key, label]) => (
+      <div>
 
         <div
-          key={key}
+          className="
+            text-3xl
+            font-semibold
+            tracking-tight
+            text-white
+          "
+        >
+          {value}
+        </div>
+
+        <div
+          className="
+            mt-1
+            text-[8px]
+            uppercase
+            tracking-[0.2em]
+            text-slate-500
+          "
+        >
+          {label}
+        </div>
+
+        <div
+          className="
+            mt-3
+            text-[8px]
+            text-emerald-400
+          "
+        >
+          {detail}
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   DATA TABLE
+========================================================= */
+
+function DataTable() {
+
+  const rows = [
+    [
+      "CAM-001",
+      "Hand",
+      "POINT",
+      "98%",
+    ],
+    [
+      "CAM-001",
+      "Hand",
+      "PINCH",
+      "96%",
+    ],
+    [
+      "CAM-002",
+      "Object",
+      "TARGET",
+      "94%",
+    ],
+    [
+      "CAM-001",
+      "Hand",
+      "TWO_FINGER",
+      "91%",
+    ],
+    [
+      "CAM-003",
+      "Object",
+      "DETECTED",
+      "89%",
+    ],
+  ];
+
+
+  return (
+
+    <div
+      className="
+        overflow-auto
+        rounded-xl
+        border
+        border-white/[0.05]
+      "
+    >
+
+      <table className="w-full text-left">
+
+        <thead>
+
+          <tr
+            className="
+              border-b
+              border-white/[0.05]
+              bg-white/[0.02]
+            "
+          >
+
+            <th className="px-3 py-2 text-[8px] text-slate-600">
+              SOURCE
+            </th>
+
+            <th className="px-3 py-2 text-[8px] text-slate-600">
+              TYPE
+            </th>
+
+            <th className="px-3 py-2 text-[8px] text-slate-600">
+              EVENT
+            </th>
+
+            <th className="px-3 py-2 text-[8px] text-slate-600">
+              CONF
+            </th>
+
+          </tr>
+
+        </thead>
+
+
+        <tbody>
+
+          {rows.map(
+            (row, index) => (
+
+              <tr
+                key={index}
+                className="
+                  border-b
+                  border-white/[0.035]
+                  last:border-0
+                "
+              >
+
+                {row.map(
+                  (value, column) => (
+
+                    <td
+                      key={column}
+                      className={`
+                        px-3
+                        py-3
+                        text-[9px]
+                        ${
+                          column === 2
+                            ? "text-cyan-300"
+                            : "text-slate-400"
+                        }
+                      `}
+                    >
+                      {value}
+                    </td>
+
+                  )
+                )}
+
+              </tr>
+
+            )
+          )}
+
+        </tbody>
+
+      </table>
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   ACTIVITY
+========================================================= */
+
+function ActivityContent() {
+
+  const events = [
+    "POINT target acquired",
+    "PINCH selection detected",
+    "Widget interaction complete",
+    "Object detection active",
+    "Vision pipeline stable",
+  ];
+
+
+  return (
+
+    <div className="space-y-3">
+
+      {events.map(
+        (event, index) => (
+
+          <div
+            key={index}
+            className="
+              flex
+              items-center
+              gap-3
+              rounded-lg
+              border
+              border-white/[0.04]
+              px-3
+              py-2.5
+            "
+          >
+
+            <span
+              className="
+                h-1.5
+                w-1.5
+                rounded-full
+                bg-cyan-400
+              "
+            />
+
+            <span
+              className="
+                text-[9px]
+                text-slate-400
+              "
+            >
+              {event}
+            </span>
+
+          </div>
+
+        )
+      )}
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   GESTURE MINI PANEL
+========================================================= */
+
+function GestureMiniPanel({
+  gestureStats,
+  getGesturePercentage,
+  totalGestures,
+}) {
+
+  return (
+
+    <div className="space-y-3">
+
+      {GESTURES.map(
+        (item) => {
+
+          const count =
+            Number(
+              gestureStats?.[
+                item.id
+              ] || 0
+            );
+
+
+          const percentage =
+            getGesturePercentage(
+              item.id
+            );
+
+
+          return (
+
+            <div key={item.id}>
+
+              <div
+                className="
+                  mb-1.5
+                  flex
+                  items-center
+                  justify-between
+                "
+              >
+
+                <span
+                  className={`
+                    text-[9px]
+                    ${item.color}
+                  `}
+                >
+                  {item.icon}{" "}
+                  {item.label}
+                </span>
+
+                <span
+                  className="
+                    text-[8px]
+                    text-slate-600
+                  "
+                >
+                  {count}
+                </span>
+
+              </div>
+
+
+              <div
+                className="
+                  h-1
+                  overflow-hidden
+                  rounded-full
+                  bg-slate-800
+                "
+              >
+
+                <div
+                  className={`
+                    h-full
+                    rounded-full
+                    ${item.bar}
+                    transition-all
+                    duration-500
+                  `}
+                  style={{
+                    width:
+                      totalGestures
+                        ? `${percentage}%`
+                        : "0%",
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+          );
+        }
+      )}
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   PIPELINE
+========================================================= */
+
+function PipelineContent() {
+
+  const items = [
+    [
+      "OpenCV",
+      "AVAILABLE",
+      true,
+    ],
+    [
+      "Hand Landmarker",
+      "READY",
+      true,
+    ],
+    [
+      "Frame Engine",
+      "READY",
+      true,
+    ],
+    [
+      "Object Detection",
+      "STANDBY",
+      false,
+    ],
+  ];
+
+
+  return (
+
+    <div
+      className="
+        grid
+        gap-3
+        sm:grid-cols-2
+        lg:grid-cols-4
+      "
+    >
+
+      {items.map(
+        (item, index) => (
+
+          <div
+            key={index}
+            className="
+              rounded-xl
+              border
+              border-white/[0.05]
+              bg-slate-900/40
+              p-4
+            "
+          >
+
+            <div
+              className="
+                text-[8px]
+                uppercase
+                tracking-wider
+                text-slate-600
+              "
+            >
+              {item[0]}
+            </div>
+
+            <div
+              className={`
+                mt-3
+                text-xs
+                font-semibold
+                ${
+                  item[2]
+                    ? "text-emerald-400"
+                    : "text-amber-300"
+                }
+              `}
+            >
+              {item[1]}
+            </div>
+
+          </div>
+
+        )
+      )}
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   AI INSIGHT
+========================================================= */
+
+function InsightContent() {
+
+  return (
+
+    <div
+      className="
+        grid
+        gap-4
+        lg:grid-cols-2
+      "
+    >
+
+      <div
+        className="
+          rounded-xl
+          border
+          border-white/[0.05]
+          bg-slate-900/40
+          p-4
+        "
+      >
+
+        <div
+          className="
+            flex
+            items-center
+            gap-2
+            text-cyan-300
+          "
+        >
+
+          <BrainCircuit
+            size={15}
+          />
+
+          <span
+            className="
+              text-[9px]
+              uppercase
+              tracking-wider
+            "
+          >
+            Detected Intent
+          </span>
+
+        </div>
+
+
+        <div
+          className="
+            mt-4
+            text-xl
+            font-semibold
+            text-white
+          "
+        >
+          Spatial Interaction
+        </div>
+
+
+        <p
+          className="
+            mt-2
+            text-[9px]
+            leading-5
+            text-slate-500
+          "
+        >
+          The interaction layer converts
+          camera-based hand movement into
+          universal dashboard commands.
+        </p>
+
+      </div>
+
+
+      <div
+        className="
+          grid
+          grid-cols-2
+          gap-3
+        "
+      >
+
+        <div
           className="
             rounded-xl
             border
-            border-slate-800
-            bg-slate-950/70
+            border-white/[0.05]
+            bg-slate-900/40
             p-4
           "
         >
 
           <div
             className="
-              text-[10px]
+              text-[8px]
               uppercase
               tracking-wider
-              text-slate-500
+              text-slate-600
             "
           >
-            {label}
+            Confidence
           </div>
 
           <div
             className="
-              mt-2
+              mt-3
               text-2xl
               font-semibold
-              text-white
+              text-cyan-300
             "
           >
-            {gestureStats[key] || 0}
+            96%
+          </div>
+
+        </div>
+
+
+        <div
+          className="
+            rounded-xl
+            border
+            border-white/[0.05]
+            bg-slate-900/40
+            p-4
+          "
+        >
+
+          <div
+            className="
+              text-[8px]
+              uppercase
+              tracking-wider
+              text-slate-600
+            "
+          >
+            Target
+          </div>
+
+          <div
+            className="
+              mt-3
+              text-2xl
+              font-semibold
+              text-emerald-300
+            "
+          >
+            LOCKED
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   SECTION HEADER
+========================================================= */
+
+function SectionHeader({
+  icon,
+  eyebrow,
+  title,
+  right,
+}) {
+
+  return (
+
+    <div
+      className="
+        flex
+        items-center
+        justify-between
+      "
+    >
+
+      <div
+        className="
+          flex
+          items-center
+          gap-3
+        "
+      >
+
+        <div
+          className="
+            flex
+            h-9
+            w-9
+            items-center
+            justify-center
+            rounded-xl
+            border
+            border-cyan-400/20
+            bg-cyan-400/5
+            text-cyan-300
+          "
+        >
+          {icon}
+        </div>
+
+
+        <div>
+
+          <div
+            className="
+              text-[8px]
+              uppercase
+              tracking-[0.25em]
+              text-cyan-400
+            "
+          >
+            {eyebrow}
           </div>
 
           <div
             className="
               mt-1
-              text-[10px]
-              text-slate-600
+              text-sm
+              font-semibold
+              text-white
             "
           >
-            interactions
+            {title}
           </div>
 
         </div>
 
-      )
-    )}
+      </div>
 
-  </div>
-
-</div>
-
-{/* ===================================================
-    BACKEND STATUS
-==================================================== */}
-
-<div
-  className="
-    mt-6
-    rounded-2xl
-    border
-    border-slate-700
-    bg-slate-900/60
-    p-5
-    backdrop-blur-xl
-  "
->
-
-  <div
-    className="
-      mb-4
-      flex
-      items-center
-      justify-between
-    "
-  >
-
-    <div>
 
       <div
         className="
-          text-xs
+          text-[8px]
           uppercase
           tracking-wider
-          text-cyan-400
+          text-slate-600
         "
       >
-        Backend Integration
-      </div>
-
-      <div
-        className="
-          mt-1
-          text-sm
-          text-slate-400
-        "
-      >
-        FastAPI computer vision services
+        {right}
       </div>
 
     </div>
-
-    <div
-      className={`
-        rounded-lg
-        border
-        px-3
-        py-2
-        text-xs
-        ${
-          backendStatus === "ONLINE"
-            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-            : backendStatus === "CONNECTING"
-            ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-400"
-            : "border-red-500/30 bg-red-500/10 text-red-400"
-        }
-      `}
-    >
-      ● {backendStatus}
-    </div>
-
-  </div>
+  );
+}
 
 
-  <div
-    className="
-      grid
-      gap-3
-      md:grid-cols-4
-    "
-  >
+/* =========================================================
+   TELEMETRY
+========================================================= */
+
+function Telemetry({
+  icon,
+  label,
+  value,
+  active = false,
+}) {
+
+  return (
 
     <div
       className="
-        rounded-xl
-        border
-        border-slate-800
-        bg-slate-950/70
-        p-4
+        flex
+        min-w-0
+        items-center
+        gap-2
       "
     >
 
-      <div
-        className="
-          text-[10px]
-          uppercase
-          tracking-wider
-          text-slate-500
-        "
-      >
-        Computer Vision
-      </div>
+      <span className="shrink-0 text-cyan-300">
+        {icon}
+      </span>
 
-      <div
-        className="
-          mt-2
-          text-sm
-          text-emerald-400
-        "
-      >
-        {visionStatus?.opencv || "—"}
-      </div>
+      <div className="min-w-0">
 
-    </div>
+        <div
+          className="
+            text-[7px]
+            uppercase
+            tracking-wider
+            text-slate-600
+          "
+        >
+          {label}
+        </div>
 
-
-    <div
-      className="
-        rounded-xl
-        border
-        border-slate-800
-        bg-slate-950/70
-        p-4
-      "
-    >
-
-      <div
-        className="
-          text-[10px]
-          uppercase
-          tracking-wider
-          text-slate-500
-        "
-      >
-        Hand Tracking
-      </div>
-
-      <div
-        className="
-          mt-2
-          text-sm
-          text-cyan-400
-        "
-      >
-        {pipelineStatus?.mediapipe || "—"}
-      </div>
-
-    </div>
-
-
-    <div
-      className="
-        rounded-xl
-        border
-        border-slate-800
-        bg-slate-950/70
-        p-4
-      "
-    >
-
-      <div
-        className="
-          text-[10px]
-          uppercase
-          tracking-wider
-          text-slate-500
-        "
-      >
-        Frame Processing
-      </div>
-
-      <div
-        className="
-          mt-2
-          text-sm
-          text-purple-400
-        "
-      >
-        {pipelineStatus?.frame_processing || "—"}
-      </div>
-
-    </div>
-
-
-    <div
-      className="
-        rounded-xl
-        border
-        border-slate-800
-        bg-slate-950/70
-        p-4
-      "
-    >
-
-      <div
-        className="
-          text-[10px]
-          uppercase
-          tracking-wider
-          text-slate-500
-        "
-      >
-        Object Detection
-      </div>
-
-      <div
-  className={`
-    mt-2
-    flex
-    items-center
-    gap-2
-    text-sm
-    ${
-      pipelineStatus?.object_detection === "ready" ||
-      pipelineStatus?.object_detection === "initialized"
-        ? "text-emerald-400"
-        : "text-yellow-400"
-    }
-  `}
->
-  <span>
-    ◈
-  </span>
-
-  {pipelineStatus?.object_detection === "ready" ||
-  pipelineStatus?.object_detection === "initialized"
-    ? "READY"
-    : pipelineStatus?.object_detection === "not_initialized"
-    ? "STANDBY"
-    : pipelineStatus?.object_detection || "—"}
-</div>
-
-    </div>
-
-  </div>
-
-
-  {backendError && (
-
-    <div
-      className="
-        mt-4
-        rounded-lg
-        border
-        border-red-500/20
-        bg-red-500/5
-        px-4
-        py-3
-        text-xs
-        text-red-300
-      "
-    >
-      Backend error: {backendError}
-    </div>
-
-  )}
-
-</div>
-
-        {/* ===================================================
-            ACTION PANEL
-        ==================================================== */}
-
-        <WidgetActionPanel
-          action={
-            activeAction
-          }
-
-          onClose={() => {
-
-            setActiveAction(
-              null
-            );
-
-            clearSelection();
-
-            setInteractionMessage(
-              "Widget closed"
-            );
-
-          }}
-        />
-
-
-        {/* ===================================================
-            DETAIL
-        ==================================================== */}
-
-        {activeAction && (
-
-          <ARWidgetDetail
-            action={
-              activeAction
+        <div
+          className={`
+            mt-0.5
+            truncate
+            text-[9px]
+            ${
+              active
+                ? "text-emerald-400"
+                : "text-cyan-300"
             }
-
-            onClose={() => {
-
-              setActiveAction(
-                null
-              );
-
-              clearSelection();
-
-              setInteractionMessage(
-                "Widget closed"
-              );
-
-            }}
-          />
-
-        )}
+          `}
+        >
+          {value}
+        </div>
 
       </div>
 
-    </section>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   CONTROL BUTTON
+========================================================= */
+
+function ControlButton({
+  icon,
+  label,
+  value,
+}) {
+
+  return (
+
+    <div
+      className="
+        flex
+        min-h-[34px]
+        items-center
+        justify-center
+        gap-2
+        rounded-lg
+        border
+        border-slate-800
+        bg-slate-900/70
+        px-3
+      "
+    >
+
+      <span className="text-cyan-300">
+        {icon}
+      </span>
+
+      <div>
+
+        <div
+          className="
+            text-[7px]
+            text-slate-600
+          "
+        >
+          {label}
+        </div>
+
+        <div
+          className="
+            text-[8px]
+            text-slate-300
+          "
+        >
+          {value}
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+
+/* =========================================================
+   INSTRUCTION
+========================================================= */
+
+function Instruction({
+  gesture,
+  action,
+}) {
+
+  return (
+
+    <div
+      className="
+        rounded-full
+        border
+        border-slate-800
+        bg-slate-900/60
+        px-3
+        py-1.5
+        text-[8px]
+      "
+    >
+
+      <span className="text-cyan-300">
+        {gesture}
+      </span>
+
+      <span className="mx-1 text-slate-700">
+        →
+      </span>
+
+      <span className="text-slate-500">
+        {action}
+      </span>
+
+    </div>
   );
 }
 
